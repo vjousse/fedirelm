@@ -20,6 +20,9 @@ import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistratio
 import Fediverse.Mastodon.Api as MastodonApi
 import Fediverse.Mastodon.Entities.AppRegistration as MastodonAppRegistration
 import Fediverse.Msg as FediEntityMsg
+import Fediverse.OAuth exposing (AppData, appDataEncoder)
+import Json.Encode as Encode
+import Ports
 import Route exposing (Route)
 import Url
 
@@ -29,7 +32,8 @@ type alias Identity =
 
 
 type alias Shared =
-    { key : Nav.Key
+    { appData : Maybe AppData
+    , key : Nav.Key
     , identity : Maybe Identity
     , sessions : FediSessions
     , location : String
@@ -64,11 +68,18 @@ type BackendMsg
 
 type Msg
     = FediMsg BackendMsg
-    | GotCode (Maybe String)
+    | GotOAuthCode (Maybe String)
     | PushRoute Route
     | ReplaceRoute Route
     | ResetIdentity
     | SetIdentity Identity (Maybe String)
+
+
+saveAppData : AppData -> Cmd Msg
+saveAppData appData =
+    appDataEncoder appData
+        |> Encode.encode 0
+        |> Ports.saveAppData
 
 
 identity : Shared -> Maybe String
@@ -78,6 +89,7 @@ identity =
 
 type alias Flags =
     { location : String
+    , appData : Maybe AppData
     }
 
 
@@ -115,7 +127,8 @@ init flags key =
                 ]
             }
     in
-    ( { key = key
+    ( { appData = flags.appData
+      , key = key
       , identity = Nothing
       , sessions = sessions
       , location = locationWithoutFragment
@@ -172,6 +185,7 @@ update : Msg -> Shared -> ( Shared, Cmd Msg )
 update msg shared =
     case msg of
         FediMsg backendMsg ->
+            -- Save AppData here
             let
                 _ =
                     Debug.log "fediMsg" (backendMsgToFediEntityMsg backendMsg)
@@ -194,7 +208,7 @@ update msg shared =
                 |> Maybe.withDefault Cmd.none
             )
 
-        GotCode code ->
+        GotOAuthCode code ->
             let
                 _ =
                     Debug.log "Code" code
@@ -216,7 +230,7 @@ setIdentity =
 
 gotCode : Maybe String -> Msg
 gotCode =
-    GotCode
+    GotOAuthCode
 
 
 replaceRoute : Route -> Msg
