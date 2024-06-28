@@ -2,6 +2,7 @@ module Shared exposing
     ( Identity
     , Msg(..)
     , Shared
+    , gotCode
     , identity
     , init
     , replaceRoute
@@ -13,12 +14,14 @@ module Shared exposing
 import Browser.Navigation as Nav
 import Fedirelm.Types exposing (Backend(..), FediSessions)
 import Fediverse.Default
+import Fediverse.Formatter
 import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistration
 import Fediverse.Mastodon.Api as MastodonApi
 import Fediverse.Mastodon.Entities.AppRegistration as MastodonAppRegistration
 import Fediverse.Msg as FediEntityMsg
 import Route exposing (Route)
+import Url
 
 
 type alias Identity =
@@ -29,6 +32,7 @@ type alias Shared =
     { key : Nav.Key
     , identity : Maybe Identity
     , sessions : FediSessions
+    , location : String
     }
 
 
@@ -59,11 +63,12 @@ type BackendMsg
 
 
 type Msg
-    = SetIdentity Identity (Maybe String)
-    | ResetIdentity
+    = FediMsg BackendMsg
+    | GotCode (Maybe String)
     | PushRoute Route
     | ReplaceRoute Route
-    | FediMsg BackendMsg
+    | ResetIdentity
+    | SetIdentity Identity (Maybe String)
 
 
 identity : Shared -> Maybe String
@@ -71,20 +76,41 @@ identity =
     .identity
 
 
-init : () -> Nav.Key -> ( Shared, Cmd Msg )
-init _ key =
+type alias Flags =
+    { location : String
+    }
+
+
+init : Flags -> Nav.Key -> ( Shared, Cmd Msg )
+init flags key =
     let
+        locationWithoutFragment =
+            flags.location
+                |> Url.fromString
+                |> Maybe.map
+                    (\location ->
+                        { protocol = location.protocol
+                        , host = location.host
+                        , port_ = location.port_
+                        , path = location.path
+                        , query = location.fragment
+                        , fragment = Nothing
+                        }
+                    )
+                |> Maybe.map Url.toString
+                |> Maybe.withDefault ""
+
         sessions =
             { currentSession =
                 Just
                     { account = Nothing
                     , backend = Mastodon
-                    , baseUrl = "https://mamot.fr"
+                    , baseUrl = Fediverse.Formatter.cleanBaseUrl "https://mamot.fr"
                     }
             , otherSessions =
                 [ { account = Nothing
                   , backend = GoToSocial
-                  , baseUrl = "https://social.bacardi55.io"
+                  , baseUrl = Fediverse.Formatter.cleanBaseUrl "https://social.bacardi55.io"
                   }
                 ]
             }
@@ -92,6 +118,7 @@ init _ key =
     ( { key = key
       , identity = Nothing
       , sessions = sessions
+      , location = locationWithoutFragment
       }
     , (case sessions.currentSession of
         Just currentSession ->
@@ -108,7 +135,7 @@ init _ key =
                             s.baseUrl
                             "fedirelm"
                             { scopes = Fediverse.Default.defaultScopes
-                            , redirectUri = Fediverse.Default.noRedirect
+                            , redirectUri = locationWithoutFragment ++ "oauth"
                             , website = Nothing
                             }
                             (FediMsg << MastodonMsg << MastodonAppCreated s.baseUrl)
@@ -118,7 +145,7 @@ init _ key =
                             s.baseUrl
                             "fedirelm"
                             { scopes = Fediverse.Default.defaultScopes
-                            , redirectUri = Fediverse.Default.noRedirect
+                            , redirectUri = locationWithoutFragment ++ "oauth"
                             , website = Nothing
                             }
                             (FediMsg << GoToSocialMsg << GoToSocialAppCreated s.baseUrl)
@@ -167,6 +194,15 @@ update msg shared =
                 |> Maybe.withDefault Cmd.none
             )
 
+        GotCode code ->
+            let
+                _ =
+                    Debug.log "Code" code
+            in
+            ( shared
+            , Nav.replaceUrl shared.key <| Route.toUrl Route.Home
+            )
+
 
 subscriptions : Shared -> Sub Msg
 subscriptions =
@@ -176,6 +212,11 @@ subscriptions =
 setIdentity : String -> Maybe String -> Msg
 setIdentity =
     SetIdentity
+
+
+gotCode : Maybe String -> Msg
+gotCode =
+    GotCode
 
 
 replaceRoute : Route -> Msg

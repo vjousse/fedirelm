@@ -1,4 +1,4 @@
-module Route exposing (Route(..), matchCounter, matchHome, matchSignIn, matchTime, toRoute, toUrl)
+module Route exposing (Route(..), matchCounter, matchHome, matchOAuth, matchSignIn, matchTime, toRoute, toUrl)
 
 import Url exposing (Url)
 import Url.Builder as Builder
@@ -8,8 +8,9 @@ import Url.Parser.Query as Query
 
 type Route
     = Home
-    | SignIn (Maybe String)
     | Counter Int
+    | OAuthRedirect (Maybe String)
+    | SignIn (Maybe String)
     | Time
     | NotFound Url
 
@@ -21,6 +22,7 @@ route =
         , map SignIn <| s "sign-in" <?> Query.string "redirect"
         , map Counter <| s "counter" <?> (Query.int "value" |> Query.map (Maybe.withDefault 0))
         , map Time <| s "time"
+        , map OAuthRedirect <| s "oauth" <?> Query.string "code"
         ]
 
 
@@ -50,6 +52,13 @@ toUrl r =
         Time ->
             "/time"
 
+        OAuthRedirect code ->
+            Builder.absolute [ "oauth" ]
+                (code
+                    |> Maybe.map (Builder.string "code" >> List.singleton)
+                    |> Maybe.withDefault []
+                )
+
         NotFound url ->
             Url.toString url
 
@@ -72,6 +81,16 @@ matchSignIn : Route -> Maybe (Maybe String)
 matchSignIn r =
     case r of
         SignIn redirect ->
+            Just redirect
+
+        _ ->
+            Nothing
+
+
+matchOAuth : Route -> Maybe (Maybe String)
+matchOAuth r =
+    case r of
+        OAuthRedirect redirect ->
             Just redirect
 
         _ ->

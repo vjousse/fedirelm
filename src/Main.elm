@@ -6,6 +6,7 @@ import Html.Attributes exposing (href, style)
 import Html.Events exposing (onClick)
 import Pages.Counter as Counter
 import Pages.Home as Home
+import Pages.OAuth as OAuth
 import Pages.SignIn as SignIn
 import Pages.Time as Time
 import Route
@@ -66,6 +67,7 @@ main =
         }
         |> Spa.addPublicPage mappers Route.matchHome Home.page
         |> Spa.addPublicPage mappers Route.matchSignIn SignIn.page
+        |> Spa.addPublicPage mappers Route.matchOAuth OAuth.page
         |> Spa.addProtectedPage mappers Route.matchCounter Counter.page
         |> Spa.addPublicPage mappers Route.matchTime Time.page
         |> Spa.application View.map
