@@ -58,7 +58,7 @@ createApp clientName options toMsg =
         redirectUri =
             Maybe.withDefault noRedirect options.redirectUri
     in
-    HttpBuilder.post "https://mamot.fr/api/v1/apps"
+    HttpBuilder.post "https://social.bacardi55.io/api/v1/apps"
         |> withBodyDecoder toMsg appDataFromServerDecoder
         |> HttpBuilder.withJsonBody
             (appRegistrationDataEncoder clientName redirectUri (String.join " " scopes) options.website)

@@ -11,9 +11,11 @@ module Shared exposing
     )
 
 import Browser.Navigation as Nav
-import Fediverse.GoToSocial.Api exposing (createApp)
-import Fediverse.Mastodon.Api exposing (Error, Response, createApp)
-import Fediverse.Mastodon.Entities.AppRegistration exposing (AppDataFromServer)
+import Fediverse.GoToSocial.Api as GoToSocialApi
+import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistration
+import Fediverse.Mastodon.Api as MastodonApi
+import Fediverse.Mastodon.Entities.AppRegistration as MastodonAppRegistration
+import Fediverse.Msg as FediEntityMsg
 import Route exposing (Route)
 
 
@@ -28,29 +30,29 @@ type alias Shared =
 
 
 type alias MastodonApiResult a =
-    Result Error (Response a)
+    Result MastodonApi.Error (MastodonApi.Response a)
 
 
 type alias GoToSocialApiResult a =
-    Result Error (Response a)
+    Result GoToSocialApi.Error (GoToSocialApi.Response a)
 
 
 type ApiResult a
-    = GotoSocialApiResult a
+    = GoToSocialApiResult a
     | MastodonApiResult a
 
 
 type MastodonMsg
-    = AppCreated (MastodonApiResult AppDataFromServer)
+    = MastodonAppCreated (MastodonApiResult MastodonAppRegistration.AppDataFromServer)
 
 
-type ServerMsg
-    = NewAppCreated (ApiResult AppDataFromServer)
+type GoToSocialMsg
+    = GoToSocialAppCreated (GoToSocialApiResult GoToSocialAppRegistration.AppDataFromServer)
 
 
-type BackendEvent
-    = MastodonEvent
-    | GotoSocialEvent
+type BackendMsg
+    = MastodonMsg MastodonMsg
+    | GoToSocialMsg GoToSocialMsg
 
 
 type Msg
@@ -58,7 +60,7 @@ type Msg
     | ResetIdentity
     | PushRoute Route
     | ReplaceRoute Route
-    | FediEvent BackendEvent MastodonMsg
+    | FediMsg BackendMsg
 
 
 identity : Shared -> Maybe String
@@ -72,31 +74,45 @@ init _ key =
       , identity = Nothing
       }
     , Cmd.batch
-        [ Fediverse.Mastodon.Api.createApp "fedirelm"
+        [ MastodonApi.createApp "fedirelm"
             { scopes = Nothing
             , redirectUri = Nothing
             , website = Nothing
             }
-            (FediEvent MastodonEvent << AppCreated)
+            (FediMsg << MastodonMsg << MastodonAppCreated)
 
         -- Do it for GoToSocial
-        --, Fediverse.GoToSocial.Api.createApp "fedirelm"
-        --    { scopes = Nothing
-        --    , redirectUri = Nothing
-        --    , website = Nothing
-        --    }
-        --    (FediEvent MastodonEvent << AppCreated)
+        , GoToSocialApi.createApp "fedirelm"
+            { scopes = Nothing
+            , redirectUri = Nothing
+            , website = Nothing
+            }
+            (FediMsg << GoToSocialMsg << GoToSocialAppCreated)
         ]
     )
+
+
+backendMsgToFediEntityMsg : BackendMsg -> Result () FediEntityMsg.Msg
+backendMsgToFediEntityMsg backendMsg =
+    case Debug.log "bck msg" backendMsg of
+        MastodonMsg (MastodonAppCreated result) ->
+            result
+                |> Result.mapError (\_ -> ())
+                |> Result.map (\a -> FediEntityMsg.AppDataReceived <| MastodonAppRegistration.toAppData a.decoded)
+
+        GoToSocialMsg (GoToSocialAppCreated result) ->
+            result
+                |> Result.mapError (\_ -> ())
+                |> Result.map (\a -> FediEntityMsg.AppDataReceived <| MastodonAppRegistration.toAppData a.decoded)
 
 
 update : Msg -> Shared -> ( Shared, Cmd Msg )
 update msg shared =
     case msg of
-        FediEvent _ fediMsg ->
+        FediMsg backendMsg ->
             let
                 _ =
-                    Debug.log "fediMsg" fediMsg
+                    Debug.log "fediMsg" (backendMsgToFediEntityMsg backendMsg)
             in
             ( shared, Cmd.none )
 

@@ -1,5 +1,6 @@
 module Fediverse.Mastodon.Entities.AppRegistration exposing (..)
 
+import Fediverse.OAuth exposing (AppData)
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipe
 import Json.Encode as Encode
@@ -39,3 +40,16 @@ appRegistrationDataEncoder clientName redirectUris scopes website =
     , ( "website", website ) |> Opt.optionalField Encode.string
     ]
         |> Opt.objectMaySkip
+
+
+toAppData : AppDataFromServer -> AppData
+toAppData self =
+    { id = self.id
+    , name = self.name
+    , website = self.website
+    , redirectUri = Just self.redirectUri
+    , clientId = self.clientId
+    , clientSecret = self.clientSecret
+    , url = Nothing
+    , sessionToken = Nothing
+    }
