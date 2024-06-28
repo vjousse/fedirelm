@@ -1,16 +1,19 @@
 import { Elm } from "../src/Main.elm";
 
+const appPrefix = "fedirelm.";
+const appDataKey = `${appPrefix}app_data`;
+
 const app = Elm.Main.init({
   flags: {
     location: window.location.href,
-    appData: JSON.parse(localStorage.getItem("fedirelm.app_data")),
+    appData: JSON.parse(localStorage.getItem(appDataKey)),
   },
 });
 
 app.ports.saveAppData.subscribe((json) => {
-  localStorage.setItem("fedirelm.app_data", json);
+  localStorage.setItem(appDataKey, json);
 });
 
-app.ports.deleteAppData.subscribe((json) => {
-  localStorage.removeItem("fedirelm.app_data");
+app.ports.deleteAppData.subscribe(() => {
+  localStorage.removeItem(appDataKey);
 });

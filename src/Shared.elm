@@ -19,7 +19,7 @@ import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistration
 import Fediverse.Mastodon.Api as MastodonApi
 import Fediverse.Mastodon.Entities.AppRegistration as MastodonAppRegistration
-import Fediverse.Msg as FediEntityMsg
+import Fediverse.Msg as FediEntityMsg exposing (Msg(..))
 import Fediverse.OAuth exposing (AppData, appDataEncoder)
 import Json.Encode as Encode
 import Ports
@@ -187,10 +187,19 @@ update msg shared =
         FediMsg backendMsg ->
             -- Save AppData here
             let
-                _ =
+                fediMsg =
                     Debug.log "fediMsg" (backendMsgToFediEntityMsg backendMsg)
             in
-            ( shared, Cmd.none )
+            ( shared
+            , case fediMsg of
+                Ok m ->
+                    case m of
+                        AppDataReceived appData ->
+                            saveAppData appData
+
+                _ ->
+                    Cmd.none
+            )
 
         PushRoute route ->
             ( shared, Nav.pushUrl shared.key <| Route.toUrl route )
@@ -214,7 +223,7 @@ update msg shared =
                     Debug.log "Code" code
             in
             ( shared
-            , Nav.replaceUrl shared.key <| Route.toUrl Route.Home
+            , Cmd.batch [ Nav.replaceUrl shared.key <| Route.toUrl Route.Home, Ports.deleteAppData () ]
             )
 
 

@@ -40,7 +40,7 @@ appDataEncoder appData =
     , ( "url", appData.url ) |> Opt.optionalField Encode.string
     , ( "website", appData.website ) |> Opt.optionalField Encode.string
     ]
-        |> Opt.objectMaySkip
+        |> Opt.objectMayNullify
 
 
 type alias TokenData =
