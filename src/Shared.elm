@@ -11,6 +11,8 @@ module Shared exposing
     )
 
 import Browser.Navigation as Nav
+import Fedirelm.Types exposing (Backend(..), FediSessions)
+import Fediverse.Default
 import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistration
 import Fediverse.Mastodon.Api as MastodonApi
@@ -26,6 +28,7 @@ type alias Identity =
 type alias Shared =
     { key : Nav.Key
     , identity : Maybe Identity
+    , sessions : FediSessions
     }
 
 
@@ -43,11 +46,11 @@ type ApiResult a
 
 
 type MastodonMsg
-    = MastodonAppCreated (MastodonApiResult MastodonAppRegistration.AppDataFromServer)
+    = MastodonAppCreated String (MastodonApiResult MastodonAppRegistration.AppDataFromServer)
 
 
 type GoToSocialMsg
-    = GoToSocialAppCreated (GoToSocialApiResult GoToSocialAppRegistration.AppDataFromServer)
+    = GoToSocialAppCreated String (GoToSocialApiResult GoToSocialAppRegistration.AppDataFromServer)
 
 
 type BackendMsg
@@ -70,40 +73,72 @@ identity =
 
 init : () -> Nav.Key -> ( Shared, Cmd Msg )
 init _ key =
+    let
+        sessions =
+            { currentSession =
+                Just
+                    { account = Nothing
+                    , backend = Mastodon
+                    , baseUrl = "https://mamot.fr"
+                    }
+            , otherSessions =
+                [ { account = Nothing
+                  , backend = GoToSocial
+                  , baseUrl = "https://social.bacardi55.io"
+                  }
+                ]
+            }
+    in
     ( { key = key
       , identity = Nothing
+      , sessions = sessions
       }
-    , Cmd.batch
-        [ MastodonApi.createApp "fedirelm"
-            { scopes = Nothing
-            , redirectUri = Nothing
-            , website = Nothing
-            }
-            (FediMsg << MastodonMsg << MastodonAppCreated)
+    , (case sessions.currentSession of
+        Just currentSession ->
+            currentSession :: sessions.otherSessions
 
-        -- Do it for GoToSocial
-        , GoToSocialApi.createApp "fedirelm"
-            { scopes = Nothing
-            , redirectUri = Nothing
-            , website = Nothing
-            }
-            (FediMsg << GoToSocialMsg << GoToSocialAppCreated)
-        ]
+        Nothing ->
+            sessions.otherSessions
+      )
+        |> List.map
+            (\s ->
+                case s.backend of
+                    Mastodon ->
+                        MastodonApi.createApp
+                            s.baseUrl
+                            "fedirelm"
+                            { scopes = Fediverse.Default.defaultScopes
+                            , redirectUri = Fediverse.Default.noRedirect
+                            , website = Nothing
+                            }
+                            (FediMsg << MastodonMsg << MastodonAppCreated s.baseUrl)
+
+                    GoToSocial ->
+                        GoToSocialApi.createApp
+                            s.baseUrl
+                            "fedirelm"
+                            { scopes = Fediverse.Default.defaultScopes
+                            , redirectUri = Fediverse.Default.noRedirect
+                            , website = Nothing
+                            }
+                            (FediMsg << GoToSocialMsg << GoToSocialAppCreated s.baseUrl)
+            )
+        |> Cmd.batch
     )
 
 
 backendMsgToFediEntityMsg : BackendMsg -> Result () FediEntityMsg.Msg
 backendMsgToFediEntityMsg backendMsg =
     case Debug.log "bck msg" backendMsg of
-        MastodonMsg (MastodonAppCreated result) ->
+        MastodonMsg (MastodonAppCreated server result) ->
             result
                 |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> FediEntityMsg.AppDataReceived <| MastodonAppRegistration.toAppData a.decoded)
+                |> Result.map (\a -> FediEntityMsg.AppDataReceived <| MastodonAppRegistration.toAppData a.decoded server)
 
-        GoToSocialMsg (GoToSocialAppCreated result) ->
+        GoToSocialMsg (GoToSocialAppCreated server result) ->
             result
                 |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> FediEntityMsg.AppDataReceived <| MastodonAppRegistration.toAppData a.decoded)
+                |> Result.map (\a -> FediEntityMsg.AppDataReceived <| MastodonAppRegistration.toAppData a.decoded server)
 
 
 update : Msg -> Shared -> ( Shared, Cmd Msg )

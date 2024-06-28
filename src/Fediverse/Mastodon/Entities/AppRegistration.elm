@@ -5,6 +5,7 @@ import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipe
 import Json.Encode as Encode
 import Json.Encode.Optional as Opt
+import Url.Builder
 
 
 type alias AppDataFromServer =
@@ -42,14 +43,27 @@ appRegistrationDataEncoder clientName redirectUris scopes website =
         |> Opt.objectMaySkip
 
 
-toAppData : AppDataFromServer -> AppData
-toAppData self =
+toAppData : AppDataFromServer -> String -> AppData
+toAppData self baseUrl =
     { id = self.id
     , name = self.name
     , website = self.website
     , redirectUri = Just self.redirectUri
     , clientId = self.clientId
     , clientSecret = self.clientSecret
-    , url = Nothing
+    , url = Just <| generateAuthUrl baseUrl self.clientId [ "" ] self.redirectUri
     , sessionToken = Nothing
     }
+
+
+generateAuthUrl : String -> String -> List String -> String -> String
+generateAuthUrl baseUrl clientId scopes redirectUri =
+    Url.Builder.crossOrigin
+        baseUrl
+        -- crossOrigin prepends a / before every entry so remove it from the start of the path
+        [ "oauth/authorize" ]
+        [ Url.Builder.string "response_type" "code"
+        , Url.Builder.string "client_id" clientId
+        , Url.Builder.string "scope" <| String.join " " scopes
+        , Url.Builder.string "redirect_uri" redirectUri
+        ]

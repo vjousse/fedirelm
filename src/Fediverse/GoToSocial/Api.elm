@@ -1,6 +1,5 @@
 module Fediverse.GoToSocial.Api exposing (..)
 
-import Fediverse.Default exposing (defaultScopes, noRedirect)
 import Fediverse.GoToSocial.Entities.AppRegistration exposing (AppDataFromServer, appDataFromServerDecoder, appRegistrationDataEncoder)
 import Http
 import HttpBuilder
@@ -21,9 +20,9 @@ type alias ErrorMsg =
 
 type alias AppInputOptions =
     { -- List of requested OAuth scopes.
-      scopes : Maybe (List String)
+      scopes : List String
     , -- Set a URI to redirect the user to.
-      redirectUri : Maybe String
+      redirectUri : String
     , -- URL of the application.
       website : Maybe String
     }
@@ -49,19 +48,12 @@ type alias Response a =
     }
 
 
-createApp : String -> AppInputOptions -> (Result Error (Response AppDataFromServer) -> msg) -> Cmd msg
-createApp clientName options toMsg =
-    let
-        scopes =
-            Maybe.withDefault defaultScopes options.scopes
-
-        redirectUri =
-            Maybe.withDefault noRedirect options.redirectUri
-    in
-    HttpBuilder.post "https://social.bacardi55.io/api/v1/apps"
+createApp : String -> String -> AppInputOptions -> (Result Error (Response AppDataFromServer) -> msg) -> Cmd msg
+createApp baseUrl clientName options toMsg =
+    HttpBuilder.post (baseUrl ++ "/api/v1/apps")
         |> withBodyDecoder toMsg appDataFromServerDecoder
         |> HttpBuilder.withJsonBody
-            (appRegistrationDataEncoder clientName redirectUri (String.join " " scopes) options.website)
+            (appRegistrationDataEncoder clientName options.redirectUri (String.join " " options.scopes) options.website)
         |> HttpBuilder.request
 
 
