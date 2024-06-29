@@ -1,11 +1,7 @@
-module Fedirelm.Types exposing (Backend(..), FediSession, FediSessions)
+module Fedirelm.Types exposing (FediSession, FediSessions)
 
 import Fediverse.Entities.Account exposing (Account)
-
-
-type Backend
-    = Mastodon
-    | GoToSocial
+import Fediverse.Entities.Backend exposing (Backend)
 
 
 type alias FediSession =

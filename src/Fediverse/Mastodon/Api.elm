@@ -1,9 +1,13 @@
 module Fediverse.Mastodon.Api exposing (..)
 
-import Fediverse.Mastodon.Entities.AppRegistration exposing (AppDataFromServer, appDataFromServerDecoder, appRegistrationDataEncoder)
+import Fediverse.Default exposing (noRedirect)
+import Fediverse.Mastodon.Entities.AppRegistration exposing (AppDataFromServer, TokenDataFromServer, appDataFromServerDecoder, appRegistrationDataEncoder, tokenDataFromServerDecoder)
+import Fediverse.OAuth exposing (AppData)
 import Http
 import HttpBuilder
 import Json.Decode as Decode
+import Json.Decode.Pipeline as Pipe
+import Json.Encode as Encode
 
 
 type alias AppInputOptions =
@@ -25,7 +29,7 @@ type alias StatusMsg =
 
 
 type alias ErrorMsg =
-    String
+    { error : String, errorDescription : Maybe String }
 
 
 type Error
@@ -57,20 +61,35 @@ createApp baseUrl clientName options toMsg =
         |> HttpBuilder.request
 
 
-registerApp : String -> String -> AppInputOptions -> (Result Error (Response AppDataFromServer) -> msg) -> Cmd msg
-registerApp baseUrl clientName options toMsg =
-    HttpBuilder.post (baseUrl ++ "/api/v1/apps")
-        |> withBodyDecoder toMsg appDataFromServerDecoder
+{-| authorizationCodeEncoder
+-}
+accessTokenPayloadEncoder : AppData -> String -> Encode.Value
+accessTokenPayloadEncoder appData authCode =
+    Encode.object
+        [ ( "client_id", Encode.string appData.clientId )
+        , ( "client_secret", Encode.string appData.clientSecret )
+        , ( "grant_type", Encode.string "authorization_code" )
+        , ( "redirect_uri", Encode.string (Maybe.withDefault noRedirect appData.redirectUri) )
+        , ( "code", Encode.string authCode )
+        ]
+
+
+getAccessToken : String -> AppData -> (Result Error (Response TokenDataFromServer) -> msg) -> Cmd msg
+getAccessToken authCode appData toMsg =
+    HttpBuilder.post (appData.baseUrl ++ "/oauth/token")
+        |> withBodyDecoder toMsg tokenDataFromServerDecoder
         |> HttpBuilder.withJsonBody
-            (appRegistrationDataEncoder clientName options.redirectUri (String.join " " options.scopes) options.website)
+            (accessTokenPayloadEncoder appData authCode)
         |> HttpBuilder.request
 
 
 {-| mastodonErrorDecoder
 -}
-mastodonErrorDecoder : Decode.Decoder String
+mastodonErrorDecoder : Decode.Decoder ErrorMsg
 mastodonErrorDecoder =
-    Decode.field "error" Decode.string
+    Decode.succeed ErrorMsg
+        |> Pipe.required "error" Decode.string
+        |> Pipe.optional "error_description" (Decode.nullable Decode.string) Nothing
 
 
 extractMastodonError : Int -> String -> String -> Error
@@ -80,8 +99,7 @@ extractMastodonError statusCode statusMsg body =
             MastodonError statusCode statusMsg errRecord
 
         Err err ->
-            Decode.errorToString err
-                |> ServerError statusCode statusMsg
+            ServerError statusCode statusMsg { error = Decode.errorToString err, errorDescription = Nothing }
 
 
 decodeResponse : Decode.Decoder a -> Http.Response String -> Result.Result Error (Response a)
@@ -108,11 +126,13 @@ decodeResponse decoder response =
                     Err
                         (ServerError metadata.statusCode
                             metadata.statusText
-                            ("Failed decoding JSON: "
-                                ++ body
-                                ++ ", error: "
-                                ++ Decode.errorToString e
-                            )
+                            { error =
+                                "Failed decoding JSON: "
+                                    ++ body
+                                    ++ ", error: "
+                                    ++ Decode.errorToString e
+                            , errorDescription = Nothing
+                            }
                         )
 
 

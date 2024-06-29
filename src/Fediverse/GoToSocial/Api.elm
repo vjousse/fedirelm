@@ -1,9 +1,12 @@
 module Fediverse.GoToSocial.Api exposing (..)
 
+import Fediverse.Default exposing (noRedirect)
 import Fediverse.GoToSocial.Entities.AppRegistration exposing (AppDataFromServer, appDataFromServerDecoder, appRegistrationDataEncoder)
+import Fediverse.OAuth exposing (AppData)
 import Http
 import HttpBuilder
 import Json.Decode as Decode
+import Json.Encode as Encode
 
 
 type alias StatusCode =
@@ -46,6 +49,28 @@ type alias Request a =
 type alias Response a =
     { decoded : a
     }
+
+
+{-| authorizationCodeEncoder
+-}
+accessTokenPayloadEncoder : AppData -> String -> Encode.Value
+accessTokenPayloadEncoder appData authCode =
+    Encode.object
+        [ ( "client_id", Encode.string appData.clientId )
+        , ( "client_secret", Encode.string appData.clientSecret )
+        , ( "grant_type", Encode.string "authorization_code" )
+        , ( "redirect_uri", Encode.string (Maybe.withDefault noRedirect appData.redirectUri) )
+        , ( "code", Encode.string authCode )
+        ]
+
+
+getAccessToken : String -> String -> AppData -> (Result Error (Response AppDataFromServer) -> msg) -> Cmd msg
+getAccessToken baseUrl authCode appData toMsg =
+    HttpBuilder.post (baseUrl ++ "/oauth/token")
+        |> withBodyDecoder toMsg appDataFromServerDecoder
+        |> HttpBuilder.withJsonBody
+            (accessTokenPayloadEncoder appData authCode)
+        |> HttpBuilder.request
 
 
 createApp : String -> String -> AppInputOptions -> (Result Error (Response AppDataFromServer) -> msg) -> Cmd msg

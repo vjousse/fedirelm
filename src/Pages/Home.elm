@@ -1,23 +1,52 @@
 module Pages.Home exposing (page)
 
-import Html exposing (a, div, text)
-import Html.Attributes exposing (href)
+import Effect exposing (Effect)
+import Html exposing (Html, a, button, div, text)
+import Html.Attributes exposing (href, style)
+import Html.Events exposing (onClick)
 import Shared exposing (Shared)
 import Spa.Page
+import Spa.PageStack exposing (Model)
 import View exposing (View)
 
 
-page : Shared -> Spa.Page.Page () Shared.Msg (View ()) () ()
+type Msg
+    = ConnectMastodon
+
+
+type alias Model =
+    { shared : Shared }
+
+
+page : Shared -> Spa.Page.Page () Shared.Msg (View Msg) Model Msg
 page shared =
-    Spa.Page.static (view shared)
+    Spa.Page.element
+        { init = init shared
+        , update = update
+        , subscriptions = always Sub.none
+        , view = view
+        }
 
 
-view : Shared -> View ()
-view shared =
+init : Shared -> () -> ( Model, Effect Shared.Msg Msg )
+init shared _ =
+    { shared = shared } |> Effect.withNone
+
+
+update : Msg -> Model -> ( Model, Effect Shared.Msg Msg )
+update msg model =
+    case msg of
+        ConnectMastodon ->
+            model
+                |> Effect.withShared Shared.connectToMasto
+
+
+view : Model -> View Msg
+view model =
     { title = "Home"
     , body =
         div []
-            [ case Shared.identity shared of
+            [ case Shared.identity model.shared of
                 Just identity ->
                     text <| "Welcome Home " ++ identity ++ "!"
 
@@ -26,5 +55,15 @@ view shared =
             , div [] [ a [ href "/counter" ] [ text "See counter" ] ]
             , div [] [ a [ href "/time" ] [ text "See time" ] ]
             , div [] [ a [ href "/oauth" ] [ text "See oauth" ] ]
+            , myButton "Connect to Masto" ConnectMastodon
             ]
     }
+
+
+myButton : String -> Msg -> Html Msg
+myButton label msg =
+    button
+        [ onClick msg
+        , style "margin" "10px"
+        ]
+        [ text label ]

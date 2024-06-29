@@ -2,6 +2,7 @@ module Shared exposing
     ( Identity
     , Msg(..)
     , Shared
+    , connectToMasto
     , gotCode
     , identity
     , init
@@ -12,16 +13,20 @@ module Shared exposing
     )
 
 import Browser.Navigation as Nav
-import Fedirelm.Types exposing (Backend(..), FediSessions)
+import Fedirelm.Types exposing (FediSessions)
 import Fediverse.Default
+import Fediverse.Entities.Backend exposing (Backend(..))
 import Fediverse.Formatter
 import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistration
 import Fediverse.Mastodon.Api as MastodonApi
 import Fediverse.Mastodon.Entities.AppRegistration as MastodonAppRegistration
 import Fediverse.Msg as FediEntityMsg exposing (Msg(..))
-import Fediverse.OAuth exposing (AppData, appDataEncoder)
+import Fediverse.OAuth exposing (AppData, appDataDecoder, appDataEncoder)
+import Json.Decode as Decode
+import Json.Decode.Pipeline as Pipe
 import Json.Encode as Encode
+import List.Extra
 import Ports
 import Route exposing (Route)
 import Url
@@ -32,7 +37,7 @@ type alias Identity =
 
 
 type alias Shared =
-    { appData : Maybe AppData
+    { appDatas : Maybe (List AppData)
     , key : Nav.Key
     , identity : Maybe Identity
     , sessions : FediSessions
@@ -55,6 +60,7 @@ type ApiResult a
 
 type MastodonMsg
     = MastodonAppCreated String (MastodonApiResult MastodonAppRegistration.AppDataFromServer)
+    | MastodonAccessToken (MastodonApiResult MastodonAppRegistration.TokenDataFromServer)
 
 
 type GoToSocialMsg
@@ -67,8 +73,9 @@ type BackendMsg
 
 
 type Msg
-    = FediMsg BackendMsg
-    | GotOAuthCode (Maybe String)
+    = ConnectToMastodon
+    | FediMsg BackendMsg
+    | GotOAuthCode ( Maybe String, Maybe String )
     | PushRoute Route
     | ReplaceRoute Route
     | ResetIdentity
@@ -89,82 +96,108 @@ identity =
 
 type alias Flags =
     { location : String
-    , appData : Maybe AppData
+    , appDatas : Maybe (List AppData)
     }
 
 
-init : Flags -> Nav.Key -> ( Shared, Cmd Msg )
-init flags key =
+{-| appDataFromServer
+-}
+flagsDecoder : Decode.Decoder Flags
+flagsDecoder =
+    Decode.succeed Flags
+        |> Pipe.required "location" Decode.string
+        |> Pipe.required "appDatas" (Decode.nullable (Decode.list appDataDecoder))
+
+
+init : Decode.Value -> Nav.Key -> ( Shared, Cmd Msg )
+init flagsJson key =
     let
-        locationWithoutFragment =
-            flags.location
-                |> Url.fromString
-                |> Maybe.map
-                    (\location ->
-                        { protocol = location.protocol
-                        , host = location.host
-                        , port_ = location.port_
-                        , path = location.path
-                        , query = location.fragment
-                        , fragment = Nothing
-                        }
-                    )
-                |> Maybe.map Url.toString
-                |> Maybe.withDefault ""
-
-        sessions =
-            { currentSession =
-                Just
-                    { account = Nothing
-                    , backend = Mastodon
-                    , baseUrl = Fediverse.Formatter.cleanBaseUrl "https://mamot.fr"
-                    }
-            , otherSessions =
-                [ { account = Nothing
-                  , backend = GoToSocial
-                  , baseUrl = Fediverse.Formatter.cleanBaseUrl "https://social.bacardi55.io"
-                  }
-                ]
-            }
+        flagsResult =
+            Decode.decodeValue flagsDecoder flagsJson
     in
-    ( { appData = flags.appData
-      , key = key
-      , identity = Nothing
-      , sessions = sessions
-      , location = locationWithoutFragment
-      }
-    , (case sessions.currentSession of
-        Just currentSession ->
-            currentSession :: sessions.otherSessions
+    case flagsResult of
+        Ok flags ->
+            let
+                locationWithoutFragment =
+                    flags.location
+                        |> Url.fromString
+                        |> Maybe.map
+                            (\location ->
+                                { protocol = location.protocol
+                                , host = location.host
+                                , port_ = location.port_
+                                , path = location.path
+                                , query = location.fragment
+                                , fragment = Nothing
+                                }
+                            )
+                        |> Maybe.map Url.toString
+                        |> Maybe.withDefault ""
 
-        Nothing ->
-            sessions.otherSessions
-      )
-        |> List.map
-            (\s ->
-                case s.backend of
-                    Mastodon ->
-                        MastodonApi.createApp
-                            s.baseUrl
-                            "fedirelm"
-                            { scopes = Fediverse.Default.defaultScopes
-                            , redirectUri = locationWithoutFragment ++ "oauth"
-                            , website = Nothing
+                sessions =
+                    { currentSession =
+                        Just
+                            { account = Nothing
+                            , backend = Mastodon
+                            , baseUrl = Fediverse.Formatter.cleanBaseUrl "https://mamot.fr"
                             }
-                            (FediMsg << MastodonMsg << MastodonAppCreated s.baseUrl)
+                    , otherSessions =
+                        [ { account = Nothing
+                          , backend = GoToSocial
+                          , baseUrl = Fediverse.Formatter.cleanBaseUrl "https://social.bacardi55.io"
+                          }
+                        ]
+                    }
+            in
+            ( { appDatas = flags.appDatas
+              , key = key
+              , identity = Nothing
+              , sessions = sessions
+              , location = locationWithoutFragment
+              }
+            , (case sessions.currentSession of
+                Just currentSession ->
+                    currentSession :: sessions.otherSessions
 
-                    GoToSocial ->
-                        GoToSocialApi.createApp
-                            s.baseUrl
-                            "fedirelm"
-                            { scopes = Fediverse.Default.defaultScopes
-                            , redirectUri = locationWithoutFragment ++ "oauth"
-                            , website = Nothing
-                            }
-                            (FediMsg << GoToSocialMsg << GoToSocialAppCreated s.baseUrl)
+                Nothing ->
+                    sessions.otherSessions
+              )
+                |> List.map
+                    (\s -> Cmd.none
+                     -- case s.backend of
+                     --     Mastodon ->
+                     --         MastodonApi.createApp
+                     --             s.baseUrl
+                     --             "fedirelm"
+                     --             { scopes = Fediverse.Default.defaultScopes
+                     --             , redirectUri = locationWithoutFragment ++ "oauth"
+                     --             , website = Nothing
+                     --             }
+                     --             (FediMsg << MastodonMsg << MastodonAppCreated s.baseUrl)
+                     --
+                     --     GoToSocial ->
+                     --         GoToSocialApi.createApp
+                     --             s.baseUrl
+                     --             "fedirelm"
+                     --             { scopes = Fediverse.Default.defaultScopes
+                     --             , redirectUri = locationWithoutFragment ++ "oauth"
+                     --             , website = Nothing
+                     --             }
+                     --             (FediMsg << GoToSocialMsg << GoToSocialAppCreated s.baseUrl)
+                    )
+                |> Cmd.batch
             )
-        |> Cmd.batch
-    )
+
+        --@TODO: properly manage the flag decoding error
+        Err _ ->
+            ( { appDatas = Nothing
+              , key = key
+              , identity = Nothing
+              , sessions = { currentSession = Nothing, otherSessions = [] }
+              , location = ""
+              }
+            , Cmd.none
+            )
 
 
 backendMsgToFediEntityMsg : BackendMsg -> Result () FediEntityMsg.Msg
@@ -173,17 +206,47 @@ backendMsgToFediEntityMsg backendMsg =
         MastodonMsg (MastodonAppCreated server result) ->
             result
                 |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> FediEntityMsg.AppDataReceived <| MastodonAppRegistration.toAppData a.decoded server)
+                |> Result.map (\a -> FediEntityMsg.AppDataReceived <| MastodonAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
+
+        MastodonMsg (MastodonAccessToken result) ->
+            result
+                |> Result.mapError (\_ -> ())
+                |> Result.map (\a -> FediEntityMsg.TokenDataReceived <| MastodonAppRegistration.toTokenData a.decoded)
 
         GoToSocialMsg (GoToSocialAppCreated server result) ->
             result
                 |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> FediEntityMsg.AppDataReceived <| MastodonAppRegistration.toAppData a.decoded server)
+                |> Result.map (\a -> FediEntityMsg.AppDataReceived <| GoToSocialAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
 
 
 update : Msg -> Shared -> ( Shared, Cmd Msg )
 update msg shared =
     case msg of
+        -- Find the first Mastodon instance in sessions and connect to it
+        ConnectToMastodon ->
+            ( shared
+            , (case shared.sessions.currentSession of
+                Just currentSession ->
+                    currentSession :: shared.sessions.otherSessions
+
+                Nothing ->
+                    shared.sessions.otherSessions
+              )
+                |> List.Extra.find (\s -> s.backend == Mastodon)
+                |> Maybe.map
+                    (\s ->
+                        MastodonApi.createApp
+                            s.baseUrl
+                            "fedirelm"
+                            { scopes = Fediverse.Default.defaultScopes
+                            , redirectUri = shared.location ++ "oauth"
+                            , website = Nothing
+                            }
+                            (FediMsg << MastodonMsg << MastodonAppCreated s.baseUrl)
+                    )
+                |> Maybe.withDefault Cmd.none
+            )
+
         FediMsg backendMsg ->
             -- Save AppData here
             let
@@ -196,6 +259,9 @@ update msg shared =
                     case m of
                         AppDataReceived appData ->
                             saveAppData appData
+
+                        TokenDataReceived tokenData ->
+                            Cmd.none
 
                 _ ->
                     Cmd.none
@@ -217,13 +283,35 @@ update msg shared =
                 |> Maybe.withDefault Cmd.none
             )
 
-        GotOAuthCode code ->
+        GotOAuthCode ( clientId, code ) ->
             let
                 _ =
-                    Debug.log "Code" code
+                    Debug.log "GotAuthCode (clientId, code)" ( clientId, code )
             in
             ( shared
-            , Cmd.batch [ Nav.replaceUrl shared.key <| Route.toUrl Route.Home, Ports.deleteAppData () ]
+            , Cmd.batch
+                [ Nav.replaceUrl shared.key <| Route.toUrl Route.Home
+                , case
+                    ( shared.appDatas
+                        |> Maybe.withDefault []
+                        |> List.Extra.find (\a -> Just a.clientId == clientId)
+                    , code
+                    )
+                  of
+                    ( Just appData, Just authCode ) ->
+                        Cmd.batch
+                            [ Ports.deleteAppData appData.clientId
+                            , case appData.backend of
+                                Mastodon ->
+                                    MastodonApi.getAccessToken authCode appData (FediMsg << MastodonMsg << MastodonAccessToken)
+
+                                _ ->
+                                    Cmd.none
+                            ]
+
+                    _ ->
+                        Cmd.none
+                ]
             )
 
 
@@ -237,16 +325,16 @@ setIdentity =
     SetIdentity
 
 
-gotCode : Maybe String -> Msg
+connectToMasto : Msg
+connectToMasto =
+    ConnectToMastodon
+
+
+gotCode : ( Maybe String, Maybe String ) -> Msg
 gotCode =
     GotOAuthCode
 
 
 replaceRoute : Route -> Msg
 replaceRoute =
-    ReplaceRoute
-
-
-pushRoute : Route -> Msg
-pushRoute =
     ReplaceRoute

@@ -1,6 +1,7 @@
 module Fediverse.Mastodon.Entities.AppRegistration exposing (..)
 
-import Fediverse.OAuth exposing (AppData)
+import Fediverse.Entities.Backend exposing (Backend(..))
+import Fediverse.OAuth exposing (AppData, TokenData)
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipe
 import Json.Encode as Encode
@@ -16,6 +17,25 @@ type alias AppDataFromServer =
     , redirectUri : String
     , website : Maybe String
     }
+
+
+type alias TokenDataFromServer =
+    { accessToken : String
+    , tokenType : String
+    , scope : String
+    , createdAt : Int
+    }
+
+
+{-| tokenDataFromServer
+-}
+tokenDataFromServerDecoder : Decode.Decoder TokenDataFromServer
+tokenDataFromServerDecoder =
+    Decode.succeed TokenDataFromServer
+        |> Pipe.required "access_token" Decode.string
+        |> Pipe.required "token_type" Decode.string
+        |> Pipe.required "scope" Decode.string
+        |> Pipe.required "created_at" Decode.int
 
 
 {-| appDataFromServer
@@ -43,16 +63,30 @@ appRegistrationDataEncoder clientName redirectUris scopes website =
         |> Opt.objectMaySkip
 
 
-toAppData : AppDataFromServer -> String -> AppData
-toAppData self baseUrl =
-    { id = self.id
+toAppData : AppDataFromServer -> String -> List String -> AppData
+toAppData self baseUrl scopes =
+    { backend = Mastodon
+    , baseUrl = baseUrl
+    , id = self.id
+    , code = Nothing
     , name = self.name
     , website = self.website
     , redirectUri = Just self.redirectUri
     , clientId = self.clientId
     , clientSecret = self.clientSecret
-    , url = Just <| generateAuthUrl baseUrl self.clientId [ "" ] self.redirectUri
+    , url = Just <| generateAuthUrl baseUrl self.clientId scopes self.redirectUri
     , sessionToken = Nothing
+    }
+
+
+toTokenData : TokenDataFromServer -> TokenData
+toTokenData self =
+    { accessToken = self.accessToken
+    , tokenType = self.tokenType
+    , scope = Just self.scope
+    , createdAt = Just self.createdAt
+    , expiresIn = Nothing
+    , refreshToken = Nothing
     }
 
 
@@ -65,5 +99,5 @@ generateAuthUrl baseUrl clientId scopes redirectUri =
         [ Url.Builder.string "response_type" "code"
         , Url.Builder.string "client_id" clientId
         , Url.Builder.string "scope" <| String.join " " scopes
-        , Url.Builder.string "redirect_uri" redirectUri
+        , Url.Builder.string "redirect_uri" (redirectUri ++ "?clientId=" ++ clientId)
         ]

@@ -1,15 +1,27 @@
 module Fediverse.OAuth exposing (..)
 
+import Fediverse.Entities.Backend exposing (Backend(..), backendDecoder, backendEncoder)
+import Json.Decode as Decode
+import Json.Decode.Pipeline as Pipe
 import Json.Encode as Encode
 import Json.Encode.Optional as Opt
 
 
 type alias AppData =
-    { -- Client ID.
-      clientId : String
+    { -- Backend type, mastodon, gotosocial, …
+      backend : Backend
+
+    -- The base url of the server this data is coming from
+    , baseUrl : String
+
+    -- Client ID.
+    , clientId : String
 
     -- Client secret.
     , clientSecret : String
+
+    -- Code returned from OAuth flow
+    , code : Maybe String
 
     -- Application ID.
     , id : String
@@ -31,7 +43,9 @@ type alias AppData =
 -}
 appDataEncoder : AppData -> Encode.Value
 appDataEncoder appData =
-    [ ( "clientId", appData.clientId ) |> Opt.field Encode.string
+    [ ( "backend", appData.backend ) |> Opt.field backendEncoder
+    , ( "baseUrl", appData.baseUrl ) |> Opt.field Encode.string
+    , ( "clientId", appData.clientId ) |> Opt.field Encode.string
     , ( "clientSecret", appData.clientSecret ) |> Opt.field Encode.string
     , ( "id", appData.id ) |> Opt.field Encode.string
     , ( "name", appData.name ) |> Opt.field Encode.string
@@ -41,6 +55,22 @@ appDataEncoder appData =
     , ( "website", appData.website ) |> Opt.optionalField Encode.string
     ]
         |> Opt.objectMayNullify
+
+
+appDataDecoder : Decode.Decoder AppData
+appDataDecoder =
+    Decode.succeed AppData
+        |> Pipe.required "backend" backendDecoder
+        |> Pipe.required "baseUrl" Decode.string
+        |> Pipe.required "clientId" Decode.string
+        |> Pipe.required "clientSecret" Decode.string
+        |> Pipe.optional "code" (Decode.nullable Decode.string) Nothing
+        |> Pipe.required "id" Decode.string
+        |> Pipe.required "name" Decode.string
+        |> Pipe.optional "redirectUri" (Decode.nullable Decode.string) Nothing
+        |> Pipe.optional "sessionToken" (Decode.nullable Decode.string) Nothing
+        |> Pipe.optional "url" (Decode.nullable Decode.string) Nothing
+        |> Pipe.optional "website" (Decode.nullable Decode.string) Nothing
 
 
 type alias TokenData =
