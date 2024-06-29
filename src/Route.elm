@@ -9,7 +9,7 @@ import Url.Parser.Query as Query
 type Route
     = Home
     | Counter Int
-    | OAuthRedirect (Maybe String) (Maybe String)
+    | OAuthRedirect String (Maybe String)
     | SignIn (Maybe String)
     | Time
     | NotFound Url
@@ -22,7 +22,7 @@ route =
         , map SignIn <| s "sign-in" <?> Query.string "redirect"
         , map Counter <| s "counter" <?> (Query.int "value" |> Query.map (Maybe.withDefault 0))
         , map Time <| s "time"
-        , map OAuthRedirect <| s "oauth" <?> Query.string "clientId" <?> Query.string "code"
+        , map OAuthRedirect <| s "oauth" </> Url.Parser.string <?> Query.string "code"
         ]
 
 
@@ -52,16 +52,11 @@ toUrl r =
         Time ->
             "/time"
 
-        OAuthRedirect clientId code ->
-            Builder.absolute [ "oauth" ]
-                ((clientId
-                    |> Maybe.map (Builder.string "clientId" >> List.singleton)
+        OAuthRedirect appDataUuid code ->
+            Builder.absolute [ "oauth", appDataUuid ]
+                (code
+                    |> Maybe.map (Builder.string "code" >> List.singleton)
                     |> Maybe.withDefault []
-                 )
-                    ++ (code
-                            |> Maybe.map (Builder.string "code" >> List.singleton)
-                            |> Maybe.withDefault []
-                       )
                 )
 
         NotFound url ->
@@ -92,11 +87,11 @@ matchSignIn r =
             Nothing
 
 
-matchOAuth : Route -> Maybe ( Maybe String, Maybe String )
+matchOAuth : Route -> Maybe ( String, Maybe String )
 matchOAuth r =
     case r of
-        OAuthRedirect code clientId ->
-            Just ( code, clientId )
+        OAuthRedirect appDataUuid code ->
+            Just ( appDataUuid, code )
 
         _ ->
             Nothing

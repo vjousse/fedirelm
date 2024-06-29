@@ -1,7 +1,7 @@
 module Pages.Home exposing (page)
 
 import Effect exposing (Effect)
-import Html exposing (Html, a, button, div, text)
+import Html exposing (Html, a, br, button, div, text)
 import Html.Attributes exposing (href, style)
 import Html.Events exposing (onClick)
 import Shared exposing (Shared)
@@ -56,6 +56,28 @@ view model =
             , div [] [ a [ href "/time" ] [ text "See time" ] ]
             , div [] [ a [ href "/oauth" ] [ text "See oauth" ] ]
             , myButton "Connect to Masto" ConnectMastodon
+            , div []
+                [ case model.shared.appDatas of
+                    Just appDatas ->
+                        if List.length appDatas == 0 then
+                            text "Empty app datas"
+
+                        else
+                            div []
+                                (List.map
+                                    (\{ appData } ->
+                                        div []
+                                            [ text ("Id: " ++ appData.clientId ++ ", secret: " ++ appData.clientSecret ++ ", redirect: " ++ Maybe.withDefault "" appData.redirectUri)
+                                            , br [] []
+                                            , a [ href <| Maybe.withDefault "" appData.url ] [ text "link to mamot" ]
+                                            ]
+                                    )
+                                    appDatas
+                                )
+
+                    Nothing ->
+                        text "No app datas"
+                ]
             ]
     }
 

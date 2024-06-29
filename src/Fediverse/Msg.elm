@@ -4,5 +4,5 @@ import Fediverse.OAuth exposing (AppData, TokenData)
 
 
 type Msg
-    = AppDataReceived AppData
-    | TokenDataReceived TokenData
+    = AppDataReceived String AppData
+    | TokenDataReceived String TokenData

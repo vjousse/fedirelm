@@ -69,5 +69,5 @@ generateAuthUrl baseUrl clientId scopes redirectUri =
         [ Url.Builder.string "response_type" "code"
         , Url.Builder.string "client_id" clientId
         , Url.Builder.string "scope" <| String.join " " scopes
-        , Url.Builder.string "redirect_uri" (redirectUri ++ "?clientId=" ++ clientId)
+        , Url.Builder.string "redirect_uri" redirectUri
         ]

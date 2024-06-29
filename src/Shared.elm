@@ -28,8 +28,11 @@ import Json.Decode.Pipeline as Pipe
 import Json.Encode as Encode
 import List.Extra
 import Ports
+import Random
 import Route exposing (Route)
+import UUID
 import Url
+import Url.Builder
 
 
 type alias Identity =
@@ -37,11 +40,12 @@ type alias Identity =
 
 
 type alias Shared =
-    { appDatas : Maybe (List AppData)
-    , key : Nav.Key
+    { appDatas : Maybe (List AppDataStorage)
     , identity : Maybe Identity
-    , sessions : FediSessions
+    , key : Nav.Key
     , location : String
+    , seeds : UUID.Seeds
+    , sessions : FediSessions
     }
 
 
@@ -59,12 +63,12 @@ type ApiResult a
 
 
 type MastodonMsg
-    = MastodonAppCreated String (MastodonApiResult MastodonAppRegistration.AppDataFromServer)
-    | MastodonAccessToken (MastodonApiResult MastodonAppRegistration.TokenDataFromServer)
+    = MastodonAppCreated String String (MastodonApiResult MastodonAppRegistration.AppDataFromServer)
+    | MastodonAccessToken String (MastodonApiResult MastodonAppRegistration.TokenDataFromServer)
 
 
 type GoToSocialMsg
-    = GoToSocialAppCreated String (GoToSocialApiResult GoToSocialAppRegistration.AppDataFromServer)
+    = GoToSocialAppCreated String String (GoToSocialApiResult GoToSocialAppRegistration.AppDataFromServer)
 
 
 type BackendMsg
@@ -75,16 +79,37 @@ type BackendMsg
 type Msg
     = ConnectToMastodon
     | FediMsg BackendMsg
-    | GotOAuthCode ( Maybe String, Maybe String )
+    | GotOAuthCode ( String, Maybe String )
     | PushRoute Route
     | ReplaceRoute Route
     | ResetIdentity
     | SetIdentity Identity (Maybe String)
 
 
-saveAppData : AppData -> Cmd Msg
-saveAppData appData =
-    appDataEncoder appData
+type alias AppDataStorage =
+    { uuid : String
+    , appData : AppData
+    }
+
+
+appDataStorageEncoder : AppDataStorage -> Encode.Value
+appDataStorageEncoder appDataStorage =
+    Encode.object
+        [ ( "uuid", Encode.string appDataStorage.uuid )
+        , ( "appData", appDataEncoder appDataStorage.appData )
+        ]
+
+
+appDataStorageDecoder : Decode.Decoder AppDataStorage
+appDataStorageDecoder =
+    Decode.succeed AppDataStorage
+        |> Pipe.required "uuid" Decode.string
+        |> Pipe.required "appData" appDataDecoder
+
+
+saveAppData : String -> AppData -> Cmd Msg
+saveAppData uuid appData =
+    appDataStorageEncoder { uuid = uuid, appData = appData }
         |> Encode.encode 0
         |> Ports.saveAppData
 
@@ -95,18 +120,32 @@ identity =
 
 
 type alias Flags =
-    { location : String
-    , appDatas : Maybe (List AppData)
+    { appDatas : Maybe (List AppDataStorage)
+    , location : String
+    , seeds : UUID.Seeds
     }
 
 
-{-| appDataFromServer
--}
+seedsDecoder : Decode.Decoder UUID.Seeds
+seedsDecoder =
+    let
+        seedDecoder =
+            Decode.int
+                |> Decode.andThen (\s -> Decode.succeed (Random.initialSeed s))
+    in
+    Decode.succeed UUID.Seeds
+        |> Pipe.required "seed1" seedDecoder
+        |> Pipe.required "seed2" seedDecoder
+        |> Pipe.required "seed3" seedDecoder
+        |> Pipe.required "seed4" seedDecoder
+
+
 flagsDecoder : Decode.Decoder Flags
 flagsDecoder =
     Decode.succeed Flags
+        |> Pipe.required "appDatas" (Decode.nullable (Decode.list appDataStorageDecoder))
         |> Pipe.required "location" Decode.string
-        |> Pipe.required "appDatas" (Decode.nullable (Decode.list appDataDecoder))
+        |> Pipe.required "seeds" seedsDecoder
 
 
 init : Decode.Value -> Nav.Key -> ( Shared, Cmd Msg )
@@ -150,51 +189,28 @@ init flagsJson key =
                     }
             in
             ( { appDatas = flags.appDatas
-              , key = key
               , identity = Nothing
-              , sessions = sessions
+              , key = key
               , location = locationWithoutFragment
+              , seeds = flags.seeds
+              , sessions = sessions
               }
-            , (case sessions.currentSession of
-                Just currentSession ->
-                    currentSession :: sessions.otherSessions
-
-                Nothing ->
-                    sessions.otherSessions
-              )
-                |> List.map
-                    (\s -> Cmd.none
-                     -- case s.backend of
-                     --     Mastodon ->
-                     --         MastodonApi.createApp
-                     --             s.baseUrl
-                     --             "fedirelm"
-                     --             { scopes = Fediverse.Default.defaultScopes
-                     --             , redirectUri = locationWithoutFragment ++ "oauth"
-                     --             , website = Nothing
-                     --             }
-                     --             (FediMsg << MastodonMsg << MastodonAppCreated s.baseUrl)
-                     --
-                     --     GoToSocial ->
-                     --         GoToSocialApi.createApp
-                     --             s.baseUrl
-                     --             "fedirelm"
-                     --             { scopes = Fediverse.Default.defaultScopes
-                     --             , redirectUri = locationWithoutFragment ++ "oauth"
-                     --             , website = Nothing
-                     --             }
-                     --             (FediMsg << GoToSocialMsg << GoToSocialAppCreated s.baseUrl)
-                    )
-                |> Cmd.batch
+            , Cmd.none
             )
 
         --@TODO: properly manage the flag decoding error
         Err _ ->
             ( { appDatas = Nothing
-              , key = key
               , identity = Nothing
-              , sessions = { currentSession = Nothing, otherSessions = [] }
+              , key = key
               , location = ""
+              , seeds =
+                    { seed1 = Random.initialSeed 0
+                    , seed2 = Random.initialSeed 0
+                    , seed3 = Random.initialSeed 0
+                    , seed4 = Random.initialSeed 0
+                    }
+              , sessions = { currentSession = Nothing, otherSessions = [] }
               }
             , Cmd.none
             )
@@ -203,20 +219,20 @@ init flagsJson key =
 backendMsgToFediEntityMsg : BackendMsg -> Result () FediEntityMsg.Msg
 backendMsgToFediEntityMsg backendMsg =
     case Debug.log "bck msg" backendMsg of
-        MastodonMsg (MastodonAppCreated server result) ->
+        MastodonMsg (MastodonAppCreated server uuid result) ->
             result
                 |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> FediEntityMsg.AppDataReceived <| MastodonAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
+                |> Result.map (\a -> FediEntityMsg.AppDataReceived uuid <| MastodonAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
 
-        MastodonMsg (MastodonAccessToken result) ->
+        MastodonMsg (MastodonAccessToken uuid result) ->
             result
                 |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> FediEntityMsg.TokenDataReceived <| MastodonAppRegistration.toTokenData a.decoded)
+                |> Result.map (\a -> FediEntityMsg.TokenDataReceived uuid <| MastodonAppRegistration.toTokenData a.decoded)
 
-        GoToSocialMsg (GoToSocialAppCreated server result) ->
+        GoToSocialMsg (GoToSocialAppCreated server uuid result) ->
             result
                 |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> FediEntityMsg.AppDataReceived <| GoToSocialAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
+                |> Result.map (\a -> FediEntityMsg.AppDataReceived uuid <| GoToSocialAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
 
 
 update : Msg -> Shared -> ( Shared, Cmd Msg )
@@ -224,6 +240,10 @@ update msg shared =
     case msg of
         -- Find the first Mastodon instance in sessions and connect to it
         ConnectToMastodon ->
+            let
+                uuid =
+                    UUID.step shared.seeds |> Tuple.first |> UUID.toString
+            in
             ( shared
             , (case shared.sessions.currentSession of
                 Just currentSession ->
@@ -234,15 +254,35 @@ update msg shared =
               )
                 |> List.Extra.find (\s -> s.backend == Mastodon)
                 |> Maybe.map
+                    -- case s.backend of
+                    --     Mastodon ->
+                    --         MastodonApi.createApp
+                    --             s.baseUrl
+                    --             "fedirelm"
+                    --             { scopes = Fediverse.Default.defaultScopes
+                    --             , redirectUri = locationWithoutFragment ++ "oauth"
+                    --             , website = Nothing
+                    --             }
+                    --             (FediMsg << MastodonMsg << MastodonAppCreated s.baseUrl)
+                    --
+                    --     GoToSocial ->
+                    --         GoToSocialApi.createApp
+                    --             s.baseUrl
+                    --             "fedirelm"
+                    --             { scopes = Fediverse.Default.defaultScopes
+                    --             , redirectUri = locationWithoutFragment ++ "oauth"
+                    --             , website = Nothing
+                    --             }
+                    --             (FediMsg << GoToSocialMsg << GoToSocialAppCreated s.baseUrl)
                     (\s ->
                         MastodonApi.createApp
                             s.baseUrl
                             "fedirelm"
                             { scopes = Fediverse.Default.defaultScopes
-                            , redirectUri = shared.location ++ "oauth"
+                            , redirectUri = Url.Builder.crossOrigin (Fediverse.Formatter.cleanBaseUrl shared.location) [ "oauth", uuid ] []
                             , website = Nothing
                             }
-                            (FediMsg << MastodonMsg << MastodonAppCreated s.baseUrl)
+                            (FediMsg << MastodonMsg << MastodonAppCreated s.baseUrl uuid)
                     )
                 |> Maybe.withDefault Cmd.none
             )
@@ -253,19 +293,17 @@ update msg shared =
                 fediMsg =
                     Debug.log "fediMsg" (backendMsgToFediEntityMsg backendMsg)
             in
-            ( shared
-            , case fediMsg of
+            case fediMsg of
                 Ok m ->
                     case m of
-                        AppDataReceived appData ->
-                            saveAppData appData
+                        AppDataReceived uuid appData ->
+                            ( shared, saveAppData uuid appData )
 
-                        TokenDataReceived tokenData ->
-                            Cmd.none
+                        TokenDataReceived uuid tokenData ->
+                            ( shared, Cmd.none )
 
                 _ ->
-                    Cmd.none
-            )
+                    ( shared, Cmd.none )
 
         PushRoute route ->
             ( shared, Nav.pushUrl shared.key <| Route.toUrl route )
@@ -283,10 +321,10 @@ update msg shared =
                 |> Maybe.withDefault Cmd.none
             )
 
-        GotOAuthCode ( clientId, code ) ->
+        GotOAuthCode ( appDataUuid, code ) ->
             let
                 _ =
-                    Debug.log "GotAuthCode (clientId, code)" ( clientId, code )
+                    Debug.log "GotAuthCode (appDataUuid, code)" ( appDataUuid, code )
             in
             ( shared
             , Cmd.batch
@@ -294,16 +332,16 @@ update msg shared =
                 , case
                     ( shared.appDatas
                         |> Maybe.withDefault []
-                        |> List.Extra.find (\a -> Just a.clientId == clientId)
+                        |> List.Extra.find (\a -> a.uuid == appDataUuid)
                     , code
                     )
                   of
-                    ( Just appData, Just authCode ) ->
+                    ( Just { appData, uuid }, Just authCode ) ->
                         Cmd.batch
-                            [ Ports.deleteAppData appData.clientId
+                            [ Ports.deleteAppData uuid
                             , case appData.backend of
                                 Mastodon ->
-                                    MastodonApi.getAccessToken authCode appData (FediMsg << MastodonMsg << MastodonAccessToken)
+                                    MastodonApi.getAccessToken authCode appData (FediMsg << MastodonMsg << MastodonAccessToken uuid)
 
                                 _ ->
                                     Cmd.none
@@ -330,7 +368,7 @@ connectToMasto =
     ConnectToMastodon
 
 
-gotCode : ( Maybe String, Maybe String ) -> Msg
+gotCode : ( String, Maybe String ) -> Msg
 gotCode =
     GotOAuthCode
 

@@ -7,7 +7,7 @@ import Spa.Page
 import View exposing (View)
 
 
-page : Shared -> Spa.Page.Page ( Maybe String, Maybe String ) Shared.Msg (View Msg) Model Msg
+page : Shared -> Spa.Page.Page ( String, Maybe String ) Shared.Msg (View Msg) Model Msg
 page _ =
     Spa.Page.element
         { init = init
@@ -22,14 +22,14 @@ type Msg
 
 
 type alias Model =
-    { clientId : Maybe String, code : Maybe String }
+    { appDataUuid : String, code : Maybe String }
 
 
-init : ( Maybe String, Maybe String ) -> ( Model, Effect Shared.Msg Msg )
-init ( clientId, code ) =
-    { clientId = clientId, code = code }
+init : ( String, Maybe String ) -> ( Model, Effect Shared.Msg Msg )
+init ( appDataUuid, code ) =
+    { appDataUuid = appDataUuid, code = code }
         |> Effect.withShared
-            (Shared.gotCode ( clientId, code ))
+            (Shared.gotCode ( appDataUuid, code ))
 
 
 update : Msg -> Model -> ( Model, Effect Shared.Msg Msg )

@@ -22,10 +22,18 @@ if (appDatas) {
   }
 }
 
+const seeds = Array.from(crypto.getRandomValues(new Uint32Array(4)));
+
 const app = Elm.Main.init({
   flags: {
     location: window.location.href,
     appDatas: appDatas,
+    seeds: {
+      seed1: seeds[0],
+      seed2: seeds[1],
+      seed3: seeds[2],
+      seed4: seeds[3],
+    },
   },
 });
 
@@ -47,7 +55,16 @@ app.ports.saveAppData.subscribe((jsonString) => {
   localStorage.setItem(appDatasKey, JSON.stringify(appDatas));
 });
 
-app.ports.deleteAppData.subscribe((clientId) => {
-  console.log(`Should remove app data with ${clientId}`);
-  //localStorage.removeItem(appDataKey);
+app.ports.deleteAppData.subscribe((uuid) => {
+  console.log(`Should remove app data with uuid ${uuid}`);
+
+  const appDatas = JSON.parse(localStorage.getItem(appDatasKey));
+
+  const appDatasToKeep = appDatas.filter((appData) => appData["uuid"] != uuid);
+
+  if (appDatasToKeep.length === 0) {
+    localStorage.removeItem(appDatasKey);
+  } else {
+    localStorage.setItem(appDatasKey, JSON.stringify(appDatasToKeep));
+  }
 });
