@@ -14,7 +14,7 @@ module Shared exposing
     )
 
 import Browser.Navigation as Nav
-import Fedirelm.Session exposing (FediSessions, sessionsDecoder)
+import Fedirelm.Session exposing (FediSessions, sessionsDecoder, sessionsEncoder)
 import Fediverse.Default
 import Fediverse.Entities.Backend exposing (Backend(..))
 import Fediverse.Formatter
@@ -116,6 +116,13 @@ saveAppData uuid appData =
         |> Ports.saveAppData
 
 
+saveSessions : FediSessions -> Cmd Msg
+saveSessions sessions =
+    sessionsEncoder sessions
+        |> Encode.encode 0
+        |> Ports.saveSessions
+
+
 identity : Shared -> Maybe String
 identity =
     .identity
@@ -167,7 +174,7 @@ init flagsJson key =
               , key = key
               , location = Url.Builder.crossOrigin flags.location [ Maybe.withDefault "" flags.prefix ] []
               , seeds = flags.seeds
-              , sessions = { currentSession = Nothing, otherSessions = [] }
+              , sessions = Maybe.withDefault { currentSession = Nothing, otherSessions = [] } flags.sessions
               }
             , Cmd.none
             )
@@ -250,7 +257,6 @@ update msg shared =
             )
 
         FediMsg backendMsg ->
-            -- Save AppData here
             let
                 fediMsg =
                     Debug.log "fediMsg" (backendMsgToFediEntityMsg backendMsg)
@@ -271,7 +277,17 @@ update msg shared =
                                         Nothing ->
                                             Just [ appDataStorage ]
                             in
-                            ( { shared | appDatas = newAppDatas }, saveAppData uuid appData )
+                            ( { shared | appDatas = newAppDatas }
+                            , Cmd.batch
+                                [ saveAppData uuid appData
+                                , case appData.url of
+                                    Just url ->
+                                        Nav.load url
+
+                                    Nothing ->
+                                        Cmd.none
+                                ]
+                            )
 
                         TokenDataReceived uuid tokenData ->
                             case appDataStorageByUuid uuid shared.appDatas of
@@ -283,7 +299,7 @@ update msg shared =
                                         sessions =
                                             Fedirelm.Session.setCurrentSession shared.sessions session
                                     in
-                                    ( { shared | sessions = sessions }, Cmd.batch [ Ports.deleteAppData uuid ] )
+                                    ( { shared | sessions = sessions }, Cmd.batch [ Ports.deleteAppData uuid, saveSessions sessions ] )
 
                                 _ ->
                                     ( shared, Cmd.none )

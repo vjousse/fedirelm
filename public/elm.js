@@ -2,6 +2,7 @@ import { Elm } from "../src/Main.elm";
 
 const appPrefix = "fedirelm";
 const appDatasKey = `${appPrefix}.app_datas`;
+const appSessionsKey = `${appPrefix}.app_sessions`;
 
 // One hour (in seconds)
 const appDatasStorageDuration = 60 * 60;
@@ -24,6 +25,8 @@ if (appDatas) {
 
 const seeds = Array.from(crypto.getRandomValues(new Uint32Array(4)));
 
+const appSessions = JSON.parse(localStorage.getItem(appSessionsKey));
+
 const app = Elm.Main.init({
   flags: {
     location: window.origin,
@@ -34,6 +37,7 @@ const app = Elm.Main.init({
       seed3: seeds[2],
       seed4: seeds[3],
     },
+    sessions: appSessions,
   },
 });
 
@@ -71,4 +75,8 @@ app.ports.deleteAppData.subscribe((uuid) => {
       localStorage.setItem(appDatasKey, JSON.stringify(appDatasToKeep));
     }
   }
+});
+
+app.ports.saveSessions.subscribe((jsonString) => {
+  localStorage.setItem(appSessionsKey, jsonString);
 });
