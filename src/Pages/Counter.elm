@@ -1,16 +1,18 @@
 module Pages.Counter exposing (Model, Msg(..), page)
 
 import Effect exposing (Effect)
+import Fedirelm.Msg
+import Fedirelm.Shared exposing (Identity, SharedModel)
 import Html exposing (Html, a, button, div, text)
 import Html.Attributes exposing (href, style)
 import Html.Events exposing (onClick)
 import Route
-import Shared exposing (Shared)
+import Shared
 import Spa.Page
 import View exposing (View)
 
 
-page : Shared -> Shared.Identity -> Spa.Page.Page Int Shared.Msg (View Msg) Model Msg
+page : SharedModel -> Identity -> Spa.Page.Page Int Fedirelm.Msg.Msg (View Msg) Model Msg
 page shared identity =
     Spa.Page.element
         { init = init
@@ -33,18 +35,18 @@ type alias Model =
     }
 
 
-init : Int -> ( Model, Effect Shared.Msg Msg )
+init : Int -> ( Model, Effect Fedirelm.Msg.Msg Msg )
 init value =
     Model value False |> Effect.withNone
 
 
-setvalue : Int -> Model -> ( Model, Effect Shared.Msg Msg )
+setvalue : Int -> Model -> ( Model, Effect Fedirelm.Msg.Msg Msg )
 setvalue value model =
     { model | amount = value }
         |> Effect.withShared (Shared.replaceRoute <| Route.Counter value)
 
 
-update : Msg -> Model -> ( Model, Effect Shared.Msg Msg )
+update : Msg -> Model -> ( Model, Effect Fedirelm.Msg.Msg Msg )
 update msg model =
     case msg of
         Increment ->

@@ -1,8 +1,5 @@
 module Shared exposing
-    ( Identity
-    , Msg(..)
-    , Shared
-    , connectToGoToSocial
+    ( connectToGoToSocial
     , connectToMasto
     , gotCode
     , identity
@@ -14,116 +11,26 @@ module Shared exposing
     )
 
 import Browser.Navigation as Nav
-import Fedirelm.Session exposing (FediSessions, sessionsDecoder, sessionsEncoder)
+import Fedirelm.AppDataStorage exposing (AppDataStorage, appDataStorageByUuid, appDataStorageDecoder)
+import Fedirelm.Msg exposing (Msg(..))
+import Fedirelm.Session exposing (FediSessions, sessionsDecoder)
+import Fedirelm.Shared exposing (SharedModel)
+import Fedirelm.Update
 import Fediverse.Default
 import Fediverse.Entities.Backend exposing (Backend(..))
 import Fediverse.Formatter
 import Fediverse.GoToSocial.Api as GoToSocialApi
-import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistration
 import Fediverse.Mastodon.Api as MastodonApi
-import Fediverse.Mastodon.Entities.AppRegistration as MastodonAppRegistration
-import Fediverse.Msg as FediEntityMsg exposing (Msg(..))
-import Fediverse.OAuth exposing (AppData, appDataDecoder, appDataEncoder)
+import Fediverse.Msg exposing (BackendMsg(..), GoToSocialMsg(..), MastodonMsg(..))
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipe
-import Json.Encode as Encode
-import List.Extra
-import Ports
 import Random
 import Route exposing (Route)
 import UUID
 import Url.Builder
 
 
-type alias Identity =
-    String
-
-
-type alias Shared =
-    { appDatas : Maybe (List AppDataStorage)
-    , identity : Maybe Identity
-    , key : Nav.Key
-    , location : String
-    , seeds : UUID.Seeds
-    , sessions : FediSessions
-    }
-
-
-type alias MastodonApiResult a =
-    Result MastodonApi.Error (MastodonApi.Response a)
-
-
-type alias GoToSocialApiResult a =
-    Result GoToSocialApi.Error (GoToSocialApi.Response a)
-
-
-type ApiResult a
-    = GoToSocialApiResult a
-    | MastodonApiResult a
-
-
-type MastodonMsg
-    = MastodonAppCreated String String (MastodonApiResult MastodonAppRegistration.AppDataFromServer)
-    | MastodonAccessToken String (MastodonApiResult MastodonAppRegistration.TokenDataFromServer)
-
-
-type GoToSocialMsg
-    = GoToSocialAppCreated String String (GoToSocialApiResult GoToSocialAppRegistration.AppDataFromServer)
-    | GoToSocialAccessToken String (GoToSocialApiResult GoToSocialAppRegistration.TokenDataFromServer)
-
-
-type BackendMsg
-    = MastodonMsg MastodonMsg
-    | GoToSocialMsg GoToSocialMsg
-
-
-type Msg
-    = ConnectToMastodon
-    | ConnectToGoToSocial
-    | FediMsg BackendMsg
-    | GotOAuthCode ( String, Maybe String )
-    | PushRoute Route
-    | ReplaceRoute Route
-    | ResetIdentity
-    | SetIdentity Identity (Maybe String)
-
-
-type alias AppDataStorage =
-    { uuid : String
-    , appData : AppData
-    }
-
-
-appDataStorageEncoder : AppDataStorage -> Encode.Value
-appDataStorageEncoder appDataStorage =
-    Encode.object
-        [ ( "uuid", Encode.string appDataStorage.uuid )
-        , ( "appData", appDataEncoder appDataStorage.appData )
-        ]
-
-
-appDataStorageDecoder : Decode.Decoder AppDataStorage
-appDataStorageDecoder =
-    Decode.succeed AppDataStorage
-        |> Pipe.required "uuid" Decode.string
-        |> Pipe.required "appData" appDataDecoder
-
-
-saveAppData : String -> AppData -> Cmd Msg
-saveAppData uuid appData =
-    appDataStorageEncoder { uuid = uuid, appData = appData }
-        |> Encode.encode 0
-        |> Ports.saveAppData
-
-
-saveSessions : FediSessions -> Cmd Msg
-saveSessions sessions =
-    sessionsEncoder sessions
-        |> Encode.encode 0
-        |> Ports.saveSessions
-
-
-identity : Shared -> Maybe String
+identity : SharedModel -> Maybe String
 identity =
     .identity
 
@@ -161,7 +68,7 @@ flagsDecoder =
         |> Pipe.optional "sessions" (Decode.nullable sessionsDecoder) Nothing
 
 
-init : Decode.Value -> Nav.Key -> ( Shared, Cmd Msg )
+init : Decode.Value -> Nav.Key -> ( SharedModel, Cmd Msg )
 init flagsJson key =
     let
         flagsResult =
@@ -197,31 +104,7 @@ init flagsJson key =
             )
 
 
-backendMsgToFediEntityMsg : BackendMsg -> Result () FediEntityMsg.Msg
-backendMsgToFediEntityMsg backendMsg =
-    case Debug.log "bck msg" backendMsg of
-        MastodonMsg (MastodonAppCreated server uuid result) ->
-            result
-                |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> FediEntityMsg.AppDataReceived uuid <| MastodonAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
-
-        MastodonMsg (MastodonAccessToken uuid result) ->
-            result
-                |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> FediEntityMsg.TokenDataReceived uuid <| MastodonAppRegistration.toTokenData a.decoded)
-
-        GoToSocialMsg (GoToSocialAppCreated server uuid result) ->
-            result
-                |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> FediEntityMsg.AppDataReceived uuid <| GoToSocialAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
-
-        GoToSocialMsg (GoToSocialAccessToken uuid result) ->
-            result
-                |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> FediEntityMsg.TokenDataReceived uuid <| MastodonAppRegistration.toTokenData a.decoded)
-
-
-update : Msg -> Shared -> ( Shared, Cmd Msg )
+update : Msg -> SharedModel -> ( SharedModel, Cmd Msg )
 update msg shared =
     case msg of
         ConnectToGoToSocial ->
@@ -257,55 +140,7 @@ update msg shared =
             )
 
         FediMsg backendMsg ->
-            let
-                fediMsg =
-                    Debug.log "fediMsg" (backendMsgToFediEntityMsg backendMsg)
-            in
-            case fediMsg of
-                Ok m ->
-                    case m of
-                        AppDataReceived uuid appData ->
-                            let
-                                appDataStorage =
-                                    { uuid = uuid, appData = appData }
-
-                                newAppDatas =
-                                    case shared.appDatas of
-                                        Just appDatas ->
-                                            Just <| appDataStorage :: appDatas
-
-                                        Nothing ->
-                                            Just [ appDataStorage ]
-                            in
-                            ( { shared | appDatas = newAppDatas }
-                            , Cmd.batch
-                                [ saveAppData uuid appData
-                                , case appData.url of
-                                    Just url ->
-                                        Nav.load url
-
-                                    Nothing ->
-                                        Cmd.none
-                                ]
-                            )
-
-                        TokenDataReceived uuid tokenData ->
-                            case appDataStorageByUuid uuid shared.appDatas of
-                                Just { appData } ->
-                                    let
-                                        session =
-                                            { account = Nothing, backend = appData.backend, token = tokenData, baseUrl = appData.baseUrl }
-
-                                        sessions =
-                                            Fedirelm.Session.setCurrentSession shared.sessions session
-                                    in
-                                    ( { shared | sessions = sessions }, Cmd.batch [ Ports.deleteAppData uuid, saveSessions sessions ] )
-
-                                _ ->
-                                    ( shared, Cmd.none )
-
-                _ ->
-                    ( shared, Cmd.none )
+            Fedirelm.Update.update backendMsg shared
 
         PushRoute route ->
             ( shared, Nav.pushUrl shared.key <| Route.toUrl route )
@@ -350,14 +185,7 @@ update msg shared =
             )
 
 
-appDataStorageByUuid : String -> Maybe (List AppDataStorage) -> Maybe AppDataStorage
-appDataStorageByUuid uuid appDatas =
-    appDatas
-        |> Maybe.withDefault []
-        |> List.Extra.find (\a -> a.uuid == uuid)
-
-
-subscriptions : Shared -> Sub Msg
+subscriptions : SharedModel -> Sub Msg
 subscriptions =
     always Sub.none
 

@@ -21,5 +21,5 @@ defaultView =
     { title = "No page"
     , body =
         Html.text
-            "You should not see this page unless you forgot to add pages to your application"
+            "404"
     }

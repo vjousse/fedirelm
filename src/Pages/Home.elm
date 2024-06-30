@@ -1,10 +1,12 @@
 module Pages.Home exposing (page)
 
 import Effect exposing (Effect)
-import Html exposing (Html, a, br, button, div, text)
+import Fedirelm.Msg
+import Fedirelm.Shared exposing (SharedModel)
+import Html exposing (Html, a, button, div, text)
 import Html.Attributes exposing (href, style)
 import Html.Events exposing (onClick)
-import Shared exposing (Shared)
+import Shared
 import Spa.Page
 import Spa.PageStack exposing (Model)
 import View exposing (View)
@@ -19,7 +21,7 @@ type alias Model =
     {}
 
 
-page : Shared -> Spa.Page.Page () Shared.Msg (View Msg) Model Msg
+page : SharedModel -> Spa.Page.Page () Fedirelm.Msg.Msg (View Msg) Model Msg
 page shared =
     Spa.Page.element
         { init = init
@@ -29,12 +31,12 @@ page shared =
         }
 
 
-init : () -> ( Model, Effect Shared.Msg Msg )
+init : () -> ( Model, Effect Fedirelm.Msg.Msg Msg )
 init _ =
     {} |> Effect.withNone
 
 
-update : Msg -> Model -> ( Model, Effect Shared.Msg Msg )
+update : Msg -> Model -> ( Model, Effect Fedirelm.Msg.Msg Msg )
 update msg model =
     case msg of
         ConnectGoToSocial ->
@@ -46,7 +48,7 @@ update msg model =
                 |> Effect.withShared Shared.connectToMasto
 
 
-view : Shared -> Model -> View Msg
+view : SharedModel -> Model -> View Msg
 view shared _ =
     { title = "Home"
     , body =
@@ -62,28 +64,6 @@ view shared _ =
             , div [] [ a [ href "/oauth" ] [ text "See oauth" ] ]
             , myButton "Connect to Masto" ConnectMastodon
             , myButton "Connect to GoToSocial" ConnectGoToSocial
-            , div []
-                [ case shared.appDatas of
-                    Just appDatas ->
-                        if List.length appDatas == 0 then
-                            text "Empty app datas"
-
-                        else
-                            div []
-                                (List.map
-                                    (\{ uuid, appData } ->
-                                        div []
-                                            [ text ("uuid: " ++ uuid ++ ", redirect: " ++ Maybe.withDefault "" appData.redirectUri)
-                                            , br [] []
-                                            , a [ href <| Maybe.withDefault "" appData.url ] [ text "link to OAuth flow" ]
-                                            ]
-                                    )
-                                    appDatas
-                                )
-
-                    Nothing ->
-                        text "No app datas"
-                ]
             ]
     }
 

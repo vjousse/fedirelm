@@ -1,6 +1,8 @@
 module Main exposing (main)
 
 import Browser exposing (Document)
+import Fedirelm.Msg
+import Fedirelm.Shared exposing (SharedModel)
 import Html exposing (a, button, div, text)
 import Html.Attributes exposing (href, style)
 import Html.Events exposing (onClick)
@@ -10,7 +12,7 @@ import Pages.OAuth as OAuth
 import Pages.SignIn as SignIn
 import Pages.Time as Time
 import Route
-import Shared exposing (Shared)
+import Shared
 import Spa
 import View exposing (View)
 
@@ -21,9 +23,9 @@ mappers =
 
 
 toDocument :
-    Shared
-    -> View (Spa.Msg Shared.Msg pageMsg)
-    -> Document (Spa.Msg Shared.Msg pageMsg)
+    SharedModel
+    -> View (Spa.Msg Fedirelm.Msg.Msg pageMsg)
+    -> Document (Spa.Msg Fedirelm.Msg.Msg pageMsg)
 toDocument shared view =
     { title = view.title
     , body =
@@ -42,7 +44,7 @@ toDocument shared view =
                         Just username ->
                             [ text username
                             , text " | "
-                            , button [ onClick (Spa.mapSharedMsg Shared.ResetIdentity) ] [ text "logout" ]
+                            , button [ onClick (Spa.mapSharedMsg Fedirelm.Msg.ResetIdentity) ] [ text "logout" ]
                             ]
 
                         Nothing ->

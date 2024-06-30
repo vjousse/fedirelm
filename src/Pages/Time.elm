@@ -1,16 +1,17 @@
 module Pages.Time exposing (Model, Msg(..), page)
 
 import Effect exposing (Effect)
+import Fedirelm.Msg
+import Fedirelm.Shared exposing (SharedModel)
 import Html exposing (a, div, text)
 import Html.Attributes exposing (href)
-import Shared exposing (Shared)
 import Spa.Page
 import Task
 import Time exposing (Posix, Zone)
 import View exposing (View)
 
 
-page : Shared -> Spa.Page.Page () Shared.Msg (View Msg) Model Msg
+page : SharedModel -> Spa.Page.Page () Fedirelm.Msg.Msg (View Msg) Model Msg
 page _ =
     Spa.Page.element
         { init = always init

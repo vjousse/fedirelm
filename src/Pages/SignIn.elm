@@ -1,15 +1,17 @@
 module Pages.SignIn exposing (Model, Msg(..), page)
 
 import Effect exposing (Effect)
+import Fedirelm.Msg
+import Fedirelm.Shared exposing (SharedModel)
 import Html exposing (Attribute, a, button, div, text)
 import Html.Attributes exposing (href, style)
 import Html.Events exposing (onClick)
-import Shared exposing (Shared)
+import Shared
 import Spa.Page
 import View exposing (View)
 
 
-page : Shared -> Spa.Page.Page (Maybe String) Shared.Msg (View Msg) Model Msg
+page : SharedModel -> Spa.Page.Page (Maybe String) Fedirelm.Msg.Msg (View Msg) Model Msg
 page shared =
     Spa.Page.element
         { init = init
@@ -27,13 +29,13 @@ type alias Model =
     { redirect : Maybe String }
 
 
-init : Maybe String -> ( Model, Effect Shared.Msg Msg )
+init : Maybe String -> ( Model, Effect Fedirelm.Msg.Msg Msg )
 init =
     Model
         >> Effect.withNone
 
 
-update : Msg -> Model -> ( Model, Effect Shared.Msg Msg )
+update : Msg -> Model -> ( Model, Effect Fedirelm.Msg.Msg Msg )
 update msg model =
     case msg of
         Login login ->
