@@ -12,6 +12,7 @@ import View exposing (View)
 
 type Msg
     = ConnectMastodon
+    | ConnectGoToSocial
 
 
 type alias Model =
@@ -36,6 +37,10 @@ init _ =
 update : Msg -> Model -> ( Model, Effect Shared.Msg Msg )
 update msg model =
     case msg of
+        ConnectGoToSocial ->
+            model
+                |> Effect.withShared Shared.connectToGoToSocial
+
         ConnectMastodon ->
             model
                 |> Effect.withShared Shared.connectToMasto
@@ -56,6 +61,7 @@ view shared _ =
             , div [] [ a [ href "/time" ] [ text "See time" ] ]
             , div [] [ a [ href "/oauth" ] [ text "See oauth" ] ]
             , myButton "Connect to Masto" ConnectMastodon
+            , myButton "Connect to GoToSocial" ConnectGoToSocial
             , div []
                 [ case shared.appDatas of
                     Just appDatas ->
@@ -65,11 +71,11 @@ view shared _ =
                         else
                             div []
                                 (List.map
-                                    (\{ appData } ->
+                                    (\{ uuid, appData } ->
                                         div []
-                                            [ text ("Id: " ++ appData.clientId ++ ", secret: " ++ appData.clientSecret ++ ", redirect: " ++ Maybe.withDefault "" appData.redirectUri)
+                                            [ text ("uuid: " ++ uuid ++ ", redirect: " ++ Maybe.withDefault "" appData.redirectUri)
                                             , br [] []
-                                            , a [ href <| Maybe.withDefault "" appData.url ] [ text "link to mamot" ]
+                                            , a [ href <| Maybe.withDefault "" appData.url ] [ text "link to OAuth flow" ]
                                             ]
                                     )
                                     appDatas

@@ -2,6 +2,7 @@ module Shared exposing
     ( Identity
     , Msg(..)
     , Shared
+    , connectToGoToSocial
     , connectToMasto
     , gotCode
     , identity
@@ -69,6 +70,7 @@ type MastodonMsg
 
 type GoToSocialMsg
     = GoToSocialAppCreated String String (GoToSocialApiResult GoToSocialAppRegistration.AppDataFromServer)
+    | GoToSocialAccessToken String (GoToSocialApiResult GoToSocialAppRegistration.TokenDataFromServer)
 
 
 type BackendMsg
@@ -78,6 +80,7 @@ type BackendMsg
 
 type Msg
     = ConnectToMastodon
+    | ConnectToGoToSocial
     | FediMsg BackendMsg
     | GotOAuthCode ( String, Maybe String )
     | PushRoute Route
@@ -234,17 +237,50 @@ backendMsgToFediEntityMsg backendMsg =
                 |> Result.mapError (\_ -> ())
                 |> Result.map (\a -> FediEntityMsg.AppDataReceived uuid <| GoToSocialAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
 
+        GoToSocialMsg (GoToSocialAccessToken uuid result) ->
+            result
+                |> Result.mapError (\_ -> ())
+                |> Result.map (\a -> FediEntityMsg.TokenDataReceived uuid <| MastodonAppRegistration.toTokenData a.decoded)
+
 
 update : Msg -> Shared -> ( Shared, Cmd Msg )
 update msg shared =
     case msg of
+        ConnectToGoToSocial ->
+            let
+                ( uuid, seeds ) =
+                    UUID.step shared.seeds |> Tuple.mapFirst UUID.toString
+            in
+            ( { shared | seeds = seeds }
+            , (case shared.sessions.currentSession of
+                Just currentSession ->
+                    currentSession :: shared.sessions.otherSessions
+
+                Nothing ->
+                    shared.sessions.otherSessions
+              )
+                |> List.Extra.find (\s -> s.backend == GoToSocial)
+                |> Maybe.map
+                    (\s ->
+                        GoToSocialApi.createApp
+                            s.baseUrl
+                            "fedirelm"
+                            { scopes = Fediverse.Default.defaultScopes
+                            , redirectUri = Url.Builder.crossOrigin (Fediverse.Formatter.cleanBaseUrl shared.location) [ "oauth", uuid ] []
+                            , website = Nothing
+                            }
+                            (FediMsg << GoToSocialMsg << GoToSocialAppCreated s.baseUrl uuid)
+                    )
+                |> Maybe.withDefault Cmd.none
+            )
+
         -- Find the first Mastodon instance in sessions and connect to it
         ConnectToMastodon ->
             let
-                uuid =
-                    UUID.step shared.seeds |> Tuple.first |> UUID.toString
+                ( uuid, seeds ) =
+                    UUID.step shared.seeds |> Tuple.mapFirst UUID.toString
             in
-            ( shared
+            ( { shared | seeds = seeds }
             , (case shared.sessions.currentSession of
                 Just currentSession ->
                     currentSession :: shared.sessions.otherSessions
@@ -254,26 +290,6 @@ update msg shared =
               )
                 |> List.Extra.find (\s -> s.backend == Mastodon)
                 |> Maybe.map
-                    -- case s.backend of
-                    --     Mastodon ->
-                    --         MastodonApi.createApp
-                    --             s.baseUrl
-                    --             "fedirelm"
-                    --             { scopes = Fediverse.Default.defaultScopes
-                    --             , redirectUri = locationWithoutFragment ++ "oauth"
-                    --             , website = Nothing
-                    --             }
-                    --             (FediMsg << MastodonMsg << MastodonAppCreated s.baseUrl)
-                    --
-                    --     GoToSocial ->
-                    --         GoToSocialApi.createApp
-                    --             s.baseUrl
-                    --             "fedirelm"
-                    --             { scopes = Fediverse.Default.defaultScopes
-                    --             , redirectUri = locationWithoutFragment ++ "oauth"
-                    --             , website = Nothing
-                    --             }
-                    --             (FediMsg << GoToSocialMsg << GoToSocialAppCreated s.baseUrl)
                     (\s ->
                         MastodonApi.createApp
                             s.baseUrl
@@ -355,8 +371,8 @@ update msg shared =
                                 Mastodon ->
                                     MastodonApi.getAccessToken authCode appData (FediMsg << MastodonMsg << MastodonAccessToken uuid)
 
-                                _ ->
-                                    Cmd.none
+                                GoToSocial ->
+                                    GoToSocialApi.getAccessToken authCode appData (FediMsg << GoToSocialMsg << GoToSocialAccessToken uuid)
                             ]
 
                     _ ->
@@ -378,6 +394,11 @@ setIdentity =
 connectToMasto : Msg
 connectToMasto =
     ConnectToMastodon
+
+
+connectToGoToSocial : Msg
+connectToGoToSocial =
+    ConnectToGoToSocial
 
 
 gotCode : ( String, Maybe String ) -> Msg

@@ -19,6 +19,25 @@ type alias AppDataFromServer =
     }
 
 
+type alias TokenDataFromServer =
+    { accessToken : String
+    , tokenType : String
+    , scope : String
+    , createdAt : Int
+    }
+
+
+{-| tokenDataFromServer
+-}
+tokenDataFromServerDecoder : Decode.Decoder TokenDataFromServer
+tokenDataFromServerDecoder =
+    Decode.succeed TokenDataFromServer
+        |> Pipe.required "access_token" Decode.string
+        |> Pipe.required "token_type" Decode.string
+        |> Pipe.required "scope" Decode.string
+        |> Pipe.required "created_at" Decode.int
+
+
 {-| appDataFromServer
 -}
 appDataFromServerDecoder : Decode.Decoder AppDataFromServer

@@ -1,7 +1,7 @@
 module Fediverse.GoToSocial.Api exposing (..)
 
 import Fediverse.Default exposing (noRedirect)
-import Fediverse.GoToSocial.Entities.AppRegistration exposing (AppDataFromServer, appDataFromServerDecoder, appRegistrationDataEncoder)
+import Fediverse.GoToSocial.Entities.AppRegistration exposing (AppDataFromServer, TokenDataFromServer, appDataFromServerDecoder, appRegistrationDataEncoder, tokenDataFromServerDecoder)
 import Fediverse.OAuth exposing (AppData)
 import Http
 import HttpBuilder
@@ -32,7 +32,7 @@ type alias AppInputOptions =
 
 
 type Error
-    = MastodonError StatusCode StatusMsg ErrorMsg
+    = GoToSocialError StatusCode StatusMsg ErrorMsg
     | ServerError StatusCode StatusMsg ErrorMsg
     | TimeoutError
     | NetworkError
@@ -64,10 +64,10 @@ accessTokenPayloadEncoder appData authCode =
         ]
 
 
-getAccessToken : String -> String -> AppData -> (Result Error (Response AppDataFromServer) -> msg) -> Cmd msg
-getAccessToken baseUrl authCode appData toMsg =
-    HttpBuilder.post (baseUrl ++ "/oauth/token")
-        |> withBodyDecoder toMsg appDataFromServerDecoder
+getAccessToken : String -> AppData -> (Result Error (Response TokenDataFromServer) -> msg) -> Cmd msg
+getAccessToken authCode appData toMsg =
+    HttpBuilder.post (appData.baseUrl ++ "/oauth/token")
+        |> withBodyDecoder toMsg tokenDataFromServerDecoder
         |> HttpBuilder.withJsonBody
             (accessTokenPayloadEncoder appData authCode)
         |> HttpBuilder.request
@@ -125,7 +125,7 @@ extractGoToSocialError : Int -> String -> String -> Error
 extractGoToSocialError statusCode statusMsg body =
     case Decode.decodeString goToSocialErrorDecoder body of
         Ok errRecord ->
-            MastodonError statusCode statusMsg errRecord
+            GoToSocialError statusCode statusMsg errRecord
 
         Err err ->
             Decode.errorToString err
