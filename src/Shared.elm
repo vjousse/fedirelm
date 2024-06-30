@@ -297,7 +297,19 @@ update msg shared =
                 Ok m ->
                     case m of
                         AppDataReceived uuid appData ->
-                            ( shared, saveAppData uuid appData )
+                            let
+                                appDataStorage =
+                                    { uuid = uuid, appData = appData }
+
+                                newAppDatas =
+                                    case shared.appDatas of
+                                        Just appDatas ->
+                                            Just <| appDataStorage :: appDatas
+
+                                        Nothing ->
+                                            Just [ appDataStorage ]
+                            in
+                            ( { shared | appDatas = newAppDatas }, saveAppData uuid appData )
 
                         TokenDataReceived uuid tokenData ->
                             ( shared, Cmd.none )
