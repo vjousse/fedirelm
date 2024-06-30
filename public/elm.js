@@ -26,7 +26,7 @@ const seeds = Array.from(crypto.getRandomValues(new Uint32Array(4)));
 
 const app = Elm.Main.init({
   flags: {
-    location: window.location.href,
+    location: window.origin,
     appDatas: appDatas,
     seeds: {
       seed1: seeds[0],
@@ -60,11 +60,15 @@ app.ports.deleteAppData.subscribe((uuid) => {
 
   const appDatas = JSON.parse(localStorage.getItem(appDatasKey));
 
-  const appDatasToKeep = appDatas.filter((appData) => appData["uuid"] != uuid);
+  if (appDatas) {
+    const appDatasToKeep = appDatas.filter(
+      (appData) => appData["uuid"] != uuid
+    );
 
-  if (appDatasToKeep.length === 0) {
-    localStorage.removeItem(appDatasKey);
-  } else {
-    localStorage.setItem(appDatasKey, JSON.stringify(appDatasToKeep));
+    if (appDatasToKeep.length === 0) {
+      localStorage.removeItem(appDatasKey);
+    } else {
+      localStorage.setItem(appDatasKey, JSON.stringify(appDatasToKeep));
+    }
   }
 });
