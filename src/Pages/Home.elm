@@ -15,22 +15,22 @@ type Msg
 
 
 type alias Model =
-    { shared : Shared }
+    {}
 
 
 page : Shared -> Spa.Page.Page () Shared.Msg (View Msg) Model Msg
 page shared =
     Spa.Page.element
-        { init = init shared
+        { init = init
         , update = update
         , subscriptions = always Sub.none
-        , view = view
+        , view = view shared
         }
 
 
-init : Shared -> () -> ( Model, Effect Shared.Msg Msg )
-init shared _ =
-    { shared = shared } |> Effect.withNone
+init : () -> ( Model, Effect Shared.Msg Msg )
+init _ =
+    {} |> Effect.withNone
 
 
 update : Msg -> Model -> ( Model, Effect Shared.Msg Msg )
@@ -41,12 +41,12 @@ update msg model =
                 |> Effect.withShared Shared.connectToMasto
 
 
-view : Model -> View Msg
-view model =
+view : Shared -> Model -> View Msg
+view shared _ =
     { title = "Home"
     , body =
         div []
-            [ case Shared.identity model.shared of
+            [ case Shared.identity shared of
                 Just identity ->
                     text <| "Welcome Home " ++ identity ++ "!"
 
@@ -57,7 +57,7 @@ view model =
             , div [] [ a [ href "/oauth" ] [ text "See oauth" ] ]
             , myButton "Connect to Masto" ConnectMastodon
             , div []
-                [ case model.shared.appDatas of
+                [ case shared.appDatas of
                     Just appDatas ->
                         if List.length appDatas == 0 then
                             text "Empty app datas"
