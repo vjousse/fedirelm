@@ -76,11 +76,6 @@ appDataDecoder =
 type alias TokenData =
     { -- Access token for the authorized user.
       accessToken : String
-    , -- Token type of the access token.
-      tokenType : String
-    , -- Scope of the access token.
-      -- Firefish does not have scope.
-      scope : Maybe String
     , -- Created date of the access token.
       -- Firefish does not have created_at.
       createdAt : Maybe Int
@@ -88,4 +83,36 @@ type alias TokenData =
       expiresIn : Maybe Int
     , -- Refresh token of the access token.
       refreshToken : Maybe String
+    , -- Scope of the access token.
+      -- Firefish does not have scope.
+      scope : Maybe String
+    , -- Token type of the access token.
+      tokenType : String
     }
+
+
+{-| tokenDataDecoder
+-}
+tokenDataDecoder : Decode.Decoder TokenData
+tokenDataDecoder =
+    Decode.succeed TokenData
+        |> Pipe.required "accessToken" Decode.string
+        |> Pipe.optional "createdAt" (Decode.nullable Decode.int) Nothing
+        |> Pipe.optional "expiresIn" (Decode.nullable Decode.int) Nothing
+        |> Pipe.optional "refreshToken" (Decode.nullable Decode.string) Nothing
+        |> Pipe.optional "scope" (Decode.nullable Decode.string) Nothing
+        |> Pipe.required "tokenType" Decode.string
+
+
+{-| tokenDataEncoder
+-}
+tokenDataEncoder : TokenData -> Encode.Value
+tokenDataEncoder tokenData =
+    [ ( "accessToken", tokenData.accessToken ) |> Opt.field Encode.string
+    , ( "tokenType", tokenData.tokenType ) |> Opt.field Encode.string
+    , ( "scope", tokenData.scope ) |> Opt.optionalField Encode.string
+    , ( "createdAt", tokenData.createdAt ) |> Opt.optionalField Encode.int
+    , ( "expiresIn", tokenData.expiresIn ) |> Opt.optionalField Encode.int
+    , ( "refreshToken", tokenData.refreshToken ) |> Opt.optionalField Encode.string
+    ]
+        |> Opt.objectMayNullify
