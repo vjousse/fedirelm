@@ -16,6 +16,7 @@ type Msg
     = ConnectMastodon
     | ConnectGoToSocial
     | ConnectPleroma
+    | ConnectUnknown String
 
 
 type alias Model =
@@ -52,6 +53,10 @@ update msg model =
             model
                 |> Effect.withShared Shared.connectToPleroma
 
+        ConnectUnknown baseUrl ->
+            model
+                |> Effect.withShared (Shared.connectToUnknown baseUrl)
+
 
 view : SharedModel -> Model -> View Msg
 view shared _ =
@@ -67,7 +72,7 @@ view shared _ =
             , div [] [ a [ href "/counter" ] [ text "See counter" ] ]
             , div [] [ a [ href "/time" ] [ text "See time" ] ]
             , div [] [ a [ href "/oauth" ] [ text "See oauth" ] ]
-            , myButton "Connect to Masto" ConnectMastodon
+            , myButton "Connect to Masto" (ConnectUnknown "https://mamot.fr")
             , myButton "Connect to GoToSocial" ConnectGoToSocial
             , myButton "Connect to Pleroma" ConnectPleroma
             ]

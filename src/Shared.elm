@@ -2,6 +2,7 @@ module Shared exposing
     ( connectToGoToSocial
     , connectToMasto
     , connectToPleroma
+    , connectToUnknown
     , gotCode
     , identity
     , init
@@ -18,11 +19,12 @@ import Fedirelm.Session exposing (FediSessions, sessionsDecoder)
 import Fedirelm.Shared exposing (SharedModel)
 import Fedirelm.Update
 import Fediverse.Default
+import Fediverse.Detector as Detector
 import Fediverse.Entities.Backend exposing (Backend(..))
 import Fediverse.Formatter
 import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.Mastodon.Api as MastodonApi
-import Fediverse.Msg exposing (BackendMsg(..), GoToSocialMsg(..), MastodonMsg(..), PleromaMsg(..))
+import Fediverse.Msg exposing (BackendMsg(..), GeneralMsg(..), GoToSocialMsg(..), MastodonMsg(..), PleromaMsg(..))
 import Fediverse.Pleroma.Api as PleromaApi
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipe
@@ -157,6 +159,9 @@ update msg shared =
                 (FediMsg << PleromaMsg << PleromaAppCreated "https://pleroma.lord.re" uuid)
             )
 
+        ConnectToUnknown baseUrl ->
+            ( shared, Detector.getLinks baseUrl (FediMsg << GeneralMsg << GeneralLinksDetected baseUrl) )
+
         FediMsg backendMsg ->
             Fedirelm.Update.update backendMsg shared
 
@@ -225,6 +230,11 @@ connectToGoToSocial =
 connectToPleroma : Msg
 connectToPleroma =
     ConnectToPleroma
+
+
+connectToUnknown : String -> Msg
+connectToUnknown baseUrl =
+    ConnectToUnknown baseUrl
 
 
 gotCode : ( String, Maybe String ) -> Msg

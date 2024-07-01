@@ -1,6 +1,7 @@
 module Fediverse.Msg exposing (..)
 
 import Fediverse.Default
+import Fediverse.Detector exposing (Links)
 import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistration
 import Fediverse.Mastodon.Api as MastodonApi
@@ -8,11 +9,13 @@ import Fediverse.Mastodon.Entities.AppRegistration as MastodonAppRegistration
 import Fediverse.OAuth exposing (AppData, TokenData)
 import Fediverse.Pleroma.Api as PleromaApi
 import Fediverse.Pleroma.Entities.AppRegistration as PleromaAppRegistration
+import Http
 
 
 type Msg
     = AppDataReceived String AppData
     | TokenDataReceived String TokenData
+    | LinksDetected String Links
 
 
 type alias MastodonApiResult a =
@@ -48,15 +51,25 @@ type PleromaMsg
     | PleromaAccessToken String (PleromaApiResult PleromaAppRegistration.TokenDataFromServer)
 
 
+type GeneralMsg
+    = GeneralLinksDetected String (Result Http.Error Links)
+
+
 type BackendMsg
     = MastodonMsg MastodonMsg
     | GoToSocialMsg GoToSocialMsg
     | PleromaMsg PleromaMsg
+    | GeneralMsg GeneralMsg
 
 
 backendMsgToFediEntityMsg : BackendMsg -> Result () Msg
 backendMsgToFediEntityMsg backendMsg =
     case Debug.log "bck msg" backendMsg of
+        GeneralMsg (GeneralLinksDetected baseUrl result) ->
+            result
+                |> Result.mapError (\_ -> ())
+                |> Result.map (\a -> LinksDetected baseUrl a)
+
         GoToSocialMsg (GoToSocialAppCreated server uuid result) ->
             result
                 |> Result.mapError (\_ -> ())

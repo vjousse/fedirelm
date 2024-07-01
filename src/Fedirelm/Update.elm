@@ -67,6 +67,13 @@ update backendMsg shared =
                         ]
                     )
 
+                LinksDetected baseUrl links ->
+                    let
+                        _ =
+                            Debug.log "linksDetected" links
+                    in
+                    ( shared, Cmd.none )
+
                 TokenDataReceived uuid tokenData ->
                     case appDataStorageByUuid uuid shared.appDatas of
                         Just { appData } ->
