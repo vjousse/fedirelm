@@ -1,6 +1,7 @@
 module Shared exposing
     ( connectToGoToSocial
     , connectToMasto
+    , connectToPleroma
     , gotCode
     , identity
     , init
@@ -21,7 +22,8 @@ import Fediverse.Entities.Backend exposing (Backend(..))
 import Fediverse.Formatter
 import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.Mastodon.Api as MastodonApi
-import Fediverse.Msg exposing (BackendMsg(..), GoToSocialMsg(..), MastodonMsg(..))
+import Fediverse.Msg exposing (BackendMsg(..), GoToSocialMsg(..), MastodonMsg(..), PleromaMsg(..))
+import Fediverse.Pleroma.Api as PleromaApi
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipe
 import Random
@@ -139,6 +141,22 @@ update msg shared =
                 (FediMsg << MastodonMsg << MastodonAppCreated "https://mamot.fr" uuid)
             )
 
+        ConnectToPleroma ->
+            let
+                ( uuid, seeds ) =
+                    UUID.step shared.seeds |> Tuple.mapFirst UUID.toString
+            in
+            ( { shared | seeds = seeds }
+            , PleromaApi.createApp
+                "https://pleroma.lord.re"
+                "fedirelm"
+                { scopes = Fediverse.Default.defaultScopes
+                , redirectUri = Url.Builder.crossOrigin (Fediverse.Formatter.cleanBaseUrl shared.location) [ "oauth", uuid ] []
+                , website = Nothing
+                }
+                (FediMsg << PleromaMsg << PleromaAppCreated "https://pleroma.lord.re" uuid)
+            )
+
         FediMsg backendMsg ->
             Fedirelm.Update.update backendMsg shared
 
@@ -159,10 +177,6 @@ update msg shared =
             )
 
         GotOAuthCode ( appDataUuid, code ) ->
-            let
-                _ =
-                    Debug.log "GotAuthCode (appDataUuid, code)" ( appDataUuid, code )
-            in
             ( shared
             , Cmd.batch
                 [ Nav.replaceUrl shared.key <| Route.toUrl Route.Home
@@ -172,11 +186,14 @@ update msg shared =
                     ( Just { appData, uuid }, Just authCode ) ->
                         Cmd.batch
                             [ case appData.backend of
+                                GoToSocial ->
+                                    GoToSocialApi.getAccessToken authCode appData (FediMsg << GoToSocialMsg << GoToSocialAccessToken uuid)
+
                                 Mastodon ->
                                     MastodonApi.getAccessToken authCode appData (FediMsg << MastodonMsg << MastodonAccessToken uuid)
 
-                                GoToSocial ->
-                                    GoToSocialApi.getAccessToken authCode appData (FediMsg << GoToSocialMsg << GoToSocialAccessToken uuid)
+                                Pleroma ->
+                                    PleromaApi.getAccessToken authCode appData (FediMsg << PleromaMsg << PleromaAccessToken uuid)
                             ]
 
                     _ ->
@@ -203,6 +220,11 @@ connectToMasto =
 connectToGoToSocial : Msg
 connectToGoToSocial =
     ConnectToGoToSocial
+
+
+connectToPleroma : Msg
+connectToPleroma =
+    ConnectToPleroma
 
 
 gotCode : ( String, Maybe String ) -> Msg

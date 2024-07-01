@@ -5,10 +5,7 @@ import Fedirelm.AppDataStorage exposing (AppDataStorage, appDataStorageByUuid)
 import Fedirelm.Msg
 import Fedirelm.Session exposing (FediSessions, sessionsEncoder)
 import Fedirelm.Shared exposing (SharedModel)
-import Fediverse.Default
-import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistration
-import Fediverse.Mastodon.Entities.AppRegistration as MastodonAppRegistration
-import Fediverse.Msg exposing (BackendMsg(..), GoToSocialMsg(..), MastodonMsg(..), Msg(..))
+import Fediverse.Msg exposing (BackendMsg(..), GoToSocialMsg(..), MastodonMsg(..), Msg(..), PleromaMsg(..), backendMsgToFediEntityMsg)
 import Fediverse.OAuth exposing (AppData, appDataEncoder)
 import Json.Encode as Encode
 import Ports
@@ -19,30 +16,6 @@ saveSessions sessions =
     sessionsEncoder sessions
         |> Encode.encode 0
         |> Ports.saveSessions
-
-
-backendMsgToFediEntityMsg : BackendMsg -> Result () Fediverse.Msg.Msg
-backendMsgToFediEntityMsg backendMsg =
-    case Debug.log "bck msg" backendMsg of
-        MastodonMsg (MastodonAppCreated server uuid result) ->
-            result
-                |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> AppDataReceived uuid <| MastodonAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
-
-        MastodonMsg (MastodonAccessToken uuid result) ->
-            result
-                |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> TokenDataReceived uuid <| MastodonAppRegistration.toTokenData a.decoded)
-
-        GoToSocialMsg (GoToSocialAppCreated server uuid result) ->
-            result
-                |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> AppDataReceived uuid <| GoToSocialAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
-
-        GoToSocialMsg (GoToSocialAccessToken uuid result) ->
-            result
-                |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> TokenDataReceived uuid <| MastodonAppRegistration.toTokenData a.decoded)
 
 
 appDataStorageEncoder : AppDataStorage -> Encode.Value

@@ -15,6 +15,7 @@ import View exposing (View)
 type Msg
     = ConnectMastodon
     | ConnectGoToSocial
+    | ConnectPleroma
 
 
 type alias Model =
@@ -47,6 +48,10 @@ update msg model =
             model
                 |> Effect.withShared Shared.connectToMasto
 
+        ConnectPleroma ->
+            model
+                |> Effect.withShared Shared.connectToPleroma
+
 
 view : SharedModel -> Model -> View Msg
 view shared _ =
@@ -64,6 +69,7 @@ view shared _ =
             , div [] [ a [ href "/oauth" ] [ text "See oauth" ] ]
             , myButton "Connect to Masto" ConnectMastodon
             , myButton "Connect to GoToSocial" ConnectGoToSocial
+            , myButton "Connect to Pleroma" ConnectPleroma
             ]
     }
 
