@@ -5,7 +5,8 @@ import Fedirelm.AppDataStorage exposing (AppDataStorage, appDataStorageByUuid)
 import Fedirelm.Msg
 import Fedirelm.Session exposing (FediSessions, sessionsEncoder)
 import Fedirelm.Shared exposing (SharedModel)
-import Fediverse.Msg exposing (BackendMsg(..), GoToSocialMsg(..), MastodonMsg(..), Msg(..), PleromaMsg(..), backendMsgToFediEntityMsg)
+import Fediverse.Detector exposing (findLink, getNodeInfo)
+import Fediverse.Msg exposing (BackendMsg(..), GeneralMsg(..), GoToSocialMsg(..), MastodonMsg(..), Msg(..), PleromaMsg(..), backendMsgToFediEntityMsg)
 import Fediverse.OAuth exposing (AppData, appDataEncoder)
 import Json.Encode as Encode
 import Ports
@@ -71,8 +72,24 @@ update backendMsg shared =
                     let
                         _ =
                             Debug.log "linksDetected" links
+
+                        link =
+                            findLink links
                     in
-                    ( shared, Cmd.none )
+                    ( shared
+                    , link
+                        |> Maybe.map (\l -> getNodeInfo l.href (Fedirelm.Msg.FediMsg << GeneralMsg << GeneralNodeInfoFetched baseUrl))
+                        |> Maybe.withDefault Cmd.none
+                    )
+
+                NodeInfoFetched baseUrl nodeInfo ->
+                    let
+                        _ =
+                            Debug.log "nodeInfoFetched" nodeInfo
+                    in
+                    ( shared
+                    , Cmd.none
+                    )
 
                 TokenDataReceived uuid tokenData ->
                     case appDataStorageByUuid uuid shared.appDatas of

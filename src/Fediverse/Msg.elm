@@ -1,7 +1,7 @@
 module Fediverse.Msg exposing (..)
 
 import Fediverse.Default
-import Fediverse.Detector exposing (Links)
+import Fediverse.Detector exposing (Links, NodeInfo)
 import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistration
 import Fediverse.Mastodon.Api as MastodonApi
@@ -16,6 +16,7 @@ type Msg
     = AppDataReceived String AppData
     | TokenDataReceived String TokenData
     | LinksDetected String Links
+    | NodeInfoFetched String NodeInfo
 
 
 type alias MastodonApiResult a =
@@ -53,6 +54,7 @@ type PleromaMsg
 
 type GeneralMsg
     = GeneralLinksDetected String (Result Http.Error Links)
+    | GeneralNodeInfoFetched String (Result Http.Error NodeInfo)
 
 
 type BackendMsg
@@ -68,7 +70,12 @@ backendMsgToFediEntityMsg backendMsg =
         GeneralMsg (GeneralLinksDetected baseUrl result) ->
             result
                 |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> LinksDetected baseUrl a)
+                |> Result.map (\links -> LinksDetected baseUrl links)
+
+        GeneralMsg (GeneralNodeInfoFetched baseUrl result) ->
+            result
+                |> Result.mapError (\_ -> ())
+                |> Result.map (\a -> NodeInfoFetched baseUrl a)
 
         GoToSocialMsg (GoToSocialAppCreated server uuid result) ->
             result
