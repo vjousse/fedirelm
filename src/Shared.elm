@@ -40,7 +40,7 @@ identity =
 
 
 type alias Flags =
-    { appDatas : Maybe (List AppDataStorage)
+    { appDataStorages : Maybe (List AppDataStorage)
     , location : String
     , prefix : Maybe String
     , seeds : UUID.Seeds
@@ -65,7 +65,7 @@ seedsDecoder =
 flagsDecoder : Decode.Decoder Flags
 flagsDecoder =
     Decode.succeed Flags
-        |> Pipe.required "appDatas" (Decode.nullable (Decode.list appDataStorageDecoder))
+        |> Pipe.required "appDataStorages" (Decode.nullable (Decode.list appDataStorageDecoder))
         |> Pipe.required "location" Decode.string
         |> Pipe.optional "prefix" (Decode.nullable Decode.string) Nothing
         |> Pipe.required "seeds" seedsDecoder
@@ -80,7 +80,7 @@ init flagsJson key =
     in
     case flagsResult of
         Ok flags ->
-            ( { appDatas = flags.appDatas
+            ( { appDataStorages = flags.appDataStorages
               , identity = Nothing
               , key = key
               , location = Url.Builder.crossOrigin flags.location [ Maybe.withDefault "" flags.prefix ] []
@@ -92,7 +92,7 @@ init flagsJson key =
 
         --@TODO: properly manage the flag decoding error
         Err _ ->
-            ( { appDatas = Nothing
+            ( { appDataStorages = Nothing
               , identity = Nothing
               , key = key
               , location = ""
@@ -186,7 +186,7 @@ update msg shared =
             , Cmd.batch
                 [ Nav.replaceUrl shared.key <| Route.toUrl Route.Home
                 , case
-                    ( appDataStorageByUuid appDataUuid shared.appDatas, code )
+                    ( appDataStorageByUuid appDataUuid shared.appDataStorages, code )
                   of
                     ( Just { appData, uuid }, Just authCode ) ->
                         Cmd.batch

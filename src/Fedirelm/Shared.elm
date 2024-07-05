@@ -11,7 +11,7 @@ type alias Identity =
 
 
 type alias SharedModel =
-    { appDatas : Maybe (List AppDataStorage)
+    { appDataStorages : Maybe (List AppDataStorage)
     , identity : Maybe Identity
     , key : Nav.Key
     , location : String

@@ -30,7 +30,7 @@ const appSessions = JSON.parse(localStorage.getItem(appSessionsKey));
 const app = Elm.Main.init({
   flags: {
     location: window.origin,
-    appDatas: appDatas,
+    appDataStorages: appDatas,
     seeds: {
       seed1: seeds[0],
       seed2: seeds[1],

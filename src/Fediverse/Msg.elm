@@ -2,9 +2,11 @@ module Fediverse.Msg exposing (..)
 
 import Fediverse.Default
 import Fediverse.Detector exposing (Links, NodeInfo)
+import Fediverse.Entities.Account exposing (Account)
 import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistration
 import Fediverse.Mastodon.Api as MastodonApi
+import Fediverse.Mastodon.Entities.Account as MastodonAccount
 import Fediverse.Mastodon.Entities.AppRegistration as MastodonAppRegistration
 import Fediverse.OAuth exposing (AppData, TokenData)
 import Fediverse.Pleroma.Api as PleromaApi
@@ -14,6 +16,7 @@ import Http
 
 type Msg
     = AppDataReceived String AppData
+    | AccountReceived String Account
     | TokenDataReceived String TokenData
     | LinksDetected String Links
     | NodeInfoFetched String NodeInfo
@@ -31,15 +34,10 @@ type alias PleromaApiResult a =
     Result PleromaApi.Error (PleromaApi.Response a)
 
 
-type ApiResult a
-    = GoToSocialApiResult a
-    | MastodonApiResult a
-    | PleromaApiResult a
-
-
 type MastodonMsg
     = MastodonAppCreated String String (MastodonApiResult MastodonAppRegistration.AppDataFromServer)
     | MastodonAccessToken String (MastodonApiResult MastodonAppRegistration.TokenDataFromServer)
+    | MastodonAccount String (MastodonApiResult MastodonAccount.Account)
 
 
 type GoToSocialMsg
@@ -87,15 +85,20 @@ backendMsgToFediEntityMsg backendMsg =
                 |> Result.mapError (\_ -> ())
                 |> Result.map (\a -> TokenDataReceived uuid <| MastodonAppRegistration.toTokenData a.decoded)
 
-        MastodonMsg (MastodonAppCreated server uuid result) ->
-            result
-                |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> AppDataReceived uuid <| MastodonAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
-
         MastodonMsg (MastodonAccessToken uuid result) ->
             result
                 |> Result.mapError (\_ -> ())
                 |> Result.map (\a -> TokenDataReceived uuid <| MastodonAppRegistration.toTokenData a.decoded)
+
+        MastodonMsg (MastodonAccount uuid result) ->
+            result
+                |> Result.mapError (\_ -> ())
+                |> Result.map (\a -> AccountReceived uuid <| MastodonAccount.toAccount a.decoded)
+
+        MastodonMsg (MastodonAppCreated server uuid result) ->
+            result
+                |> Result.mapError (\_ -> ())
+                |> Result.map (\a -> AppDataReceived uuid <| MastodonAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
 
         PleromaMsg (PleromaAppCreated server uuid result) ->
             result

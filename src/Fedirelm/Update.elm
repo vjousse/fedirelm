@@ -6,6 +6,7 @@ import Fedirelm.Msg
 import Fedirelm.Session exposing (FediSessions, sessionsEncoder)
 import Fedirelm.Shared exposing (SharedModel)
 import Fediverse.Detector exposing (findLink, getNodeInfo)
+import Fediverse.Mastodon.Api as MastodonApi
 import Fediverse.Msg exposing (BackendMsg(..), GeneralMsg(..), GoToSocialMsg(..), MastodonMsg(..), Msg(..), PleromaMsg(..), backendMsgToFediEntityMsg)
 import Fediverse.OAuth exposing (AppData, appDataEncoder)
 import Json.Encode as Encode
@@ -48,15 +49,15 @@ update backendMsg shared =
                         appDataStorage =
                             { uuid = uuid, appData = appData }
 
-                        newAppDatas =
-                            case shared.appDatas of
-                                Just appDatas ->
-                                    Just <| appDataStorage :: appDatas
+                        newAppDataStorages =
+                            case shared.appDataStorages of
+                                Just appDataStorages ->
+                                    Just <| appDataStorage :: appDataStorages
 
                                 Nothing ->
                                     Just [ appDataStorage ]
                     in
-                    ( { shared | appDatas = newAppDatas }
+                    ( { shared | appDataStorages = newAppDataStorages }
                     , Cmd.batch
                         [ saveAppData uuid appData
                         , case appData.url of
@@ -67,6 +68,13 @@ update backendMsg shared =
                                 Cmd.none
                         ]
                     )
+
+                AccountReceived uuid account ->
+                    let
+                        _ =
+                            Debug.log "Account" account
+                    in
+                    ( shared, Cmd.none )
 
                 LinksDetected baseUrl links ->
                     let
@@ -92,7 +100,7 @@ update backendMsg shared =
                     )
 
                 TokenDataReceived uuid tokenData ->
-                    case appDataStorageByUuid uuid shared.appDatas of
+                    case appDataStorageByUuid uuid shared.appDataStorages of
                         Just { appData } ->
                             let
                                 session =
@@ -100,8 +108,25 @@ update backendMsg shared =
 
                                 sessions =
                                     Fedirelm.Session.setCurrentSession shared.sessions session
+
+                                newAppDataStorages =
+                                    shared.appDataStorages
+                                        |> Maybe.map
+                                            (\appDataStorages ->
+                                                appDataStorages
+                                                    |> List.filter (\a -> a.uuid /= uuid)
+                                            )
                             in
-                            ( { shared | sessions = sessions }, Cmd.batch [ Ports.deleteAppData uuid, saveSessions sessions ] )
+                            ( { shared | sessions = sessions, appDataStorages = newAppDataStorages }
+                            , Cmd.batch
+                                [ Ports.deleteAppData uuid
+                                , saveSessions sessions
+                                , MastodonApi.getAccount
+                                    appData.baseUrl
+                                    tokenData.accessToken
+                                    (Fedirelm.Msg.FediMsg << MastodonMsg << MastodonAccount uuid)
+                                ]
+                            )
 
                         _ ->
                             ( shared, Cmd.none )
