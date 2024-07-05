@@ -11,6 +11,7 @@ import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.Mastodon.Api as MastodonApi
 import Fediverse.Msg exposing (BackendMsg(..), GeneralMsg(..), GoToSocialMsg(..), MastodonMsg(..), Msg(..), PleromaMsg(..), backendMsgToFediEntityMsg)
 import Fediverse.OAuth exposing (AppData, appDataEncoder)
+import Fediverse.Pleroma.Api as PleromaApi
 import Json.Encode as Encode
 import Ports
 import UUID
@@ -161,17 +162,13 @@ update backendMsg shared =
                                 -- Use the new created token to get the corresponding account
                                 , case appData.backend of
                                     GoToSocial ->
-                                        GoToSocialApi.getAccount appData.baseUrl tokenData.accessToken (Fedirelm.Msg.FediMsg << GoToSocialMsg << GoToSocialAccount sessionUuid)
+                                        GoToSocialApi.verifiyCredentials appData.baseUrl tokenData.accessToken (Fedirelm.Msg.FediMsg << GoToSocialMsg << GoToSocialAccount sessionUuid)
 
                                     Mastodon ->
-                                        MastodonApi.getAccount appData.baseUrl tokenData.accessToken (Fedirelm.Msg.FediMsg << MastodonMsg << MastodonAccount sessionUuid)
+                                        MastodonApi.verifiyCredentials appData.baseUrl tokenData.accessToken (Fedirelm.Msg.FediMsg << MastodonMsg << MastodonAccount sessionUuid)
 
-                                    backend ->
-                                        let
-                                            _ =
-                                                Debug.log "Backend Not Implemented for getAccount" backend
-                                        in
-                                        Cmd.none
+                                    Pleroma ->
+                                        PleromaApi.verifiyCredentials appData.baseUrl tokenData.accessToken (Fedirelm.Msg.FediMsg << PleromaMsg << PleromaAccount sessionUuid)
                                 ]
                             )
 

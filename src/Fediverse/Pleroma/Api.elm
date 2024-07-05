@@ -2,6 +2,7 @@ module Fediverse.Pleroma.Api exposing (..)
 
 import Fediverse.Default exposing (noRedirect)
 import Fediverse.OAuth exposing (AppData)
+import Fediverse.Pleroma.Entities.Account exposing (Account, accountDecoder)
 import Fediverse.Pleroma.Entities.AppRegistration exposing (AppDataFromServer, TokenDataFromServer, appDataFromServerDecoder, appRegistrationDataEncoder, tokenDataFromServerDecoder)
 import Http
 import HttpBuilder
@@ -80,6 +81,14 @@ getAccessToken authCode appData toMsg =
         |> withBodyDecoder toMsg tokenDataFromServerDecoder
         |> HttpBuilder.withJsonBody
             (accessTokenPayloadEncoder appData authCode)
+        |> HttpBuilder.request
+
+
+verifiyCredentials : String -> String -> (Result Error (Response Account) -> msg) -> Cmd msg
+verifiyCredentials baseUrl token toMsg =
+    HttpBuilder.get (baseUrl ++ "/api/v1/accounts/verify_credentials")
+        |> withBodyDecoder toMsg accountDecoder
+        |> HttpBuilder.withHeader "Authorization" ("Bearer " ++ token)
         |> HttpBuilder.request
 
 

@@ -84,8 +84,8 @@ getAccessToken authCode appData toMsg =
         |> HttpBuilder.request
 
 
-getAccount : String -> String -> (Result Error (Response Account) -> msg) -> Cmd msg
-getAccount baseUrl token toMsg =
+verifiyCredentials : String -> String -> (Result Error (Response Account) -> msg) -> Cmd msg
+verifiyCredentials baseUrl token toMsg =
     HttpBuilder.get (baseUrl ++ "/api/v1/accounts/verify_credentials")
         |> withBodyDecoder toMsg accountDecoder
         |> HttpBuilder.withHeader "Authorization" ("Bearer " ++ token)
