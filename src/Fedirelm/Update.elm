@@ -6,6 +6,8 @@ import Fedirelm.Msg
 import Fedirelm.Session exposing (FediSessions, sessionsEncoder)
 import Fedirelm.Shared exposing (SharedModel)
 import Fediverse.Detector exposing (findLink, getNodeInfo)
+import Fediverse.Entities.Backend exposing (Backend(..))
+import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.Mastodon.Api as MastodonApi
 import Fediverse.Msg exposing (BackendMsg(..), GeneralMsg(..), GoToSocialMsg(..), MastodonMsg(..), Msg(..), PleromaMsg(..), backendMsgToFediEntityMsg)
 import Fediverse.OAuth exposing (AppData, appDataEncoder)
@@ -88,7 +90,7 @@ update backendMsg shared =
                                 -- @FIXME: throw an error if we don't find the session locally because we should…
                                 |> Maybe.withDefault shared.sessions
                     in
-                    ( { shared | sessions = newSessions }, Cmd.none )
+                    ( { shared | sessions = newSessions }, saveSessions newSessions )
 
                 LinksDetected baseUrl links ->
                     let
@@ -157,10 +159,19 @@ update backendMsg shared =
                                 , saveSessions sessions
 
                                 -- Use the new created token to get the corresponding account
-                                , MastodonApi.getAccount
-                                    appData.baseUrl
-                                    tokenData.accessToken
-                                    (Fedirelm.Msg.FediMsg << MastodonMsg << MastodonAccount sessionUuid)
+                                , case appData.backend of
+                                    GoToSocial ->
+                                        GoToSocialApi.getAccount appData.baseUrl tokenData.accessToken (Fedirelm.Msg.FediMsg << GoToSocialMsg << GoToSocialAccount sessionUuid)
+
+                                    Mastodon ->
+                                        MastodonApi.getAccount appData.baseUrl tokenData.accessToken (Fedirelm.Msg.FediMsg << MastodonMsg << MastodonAccount sessionUuid)
+
+                                    backend ->
+                                        let
+                                            _ =
+                                                Debug.log "Backend Not Implemented for getAccount" backend
+                                        in
+                                        Cmd.none
                                 ]
                             )
 

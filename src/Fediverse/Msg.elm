@@ -4,6 +4,7 @@ import Fediverse.Default
 import Fediverse.Detector exposing (Links, NodeInfo)
 import Fediverse.Entities.Account exposing (Account)
 import Fediverse.GoToSocial.Api as GoToSocialApi
+import Fediverse.GoToSocial.Entities.Account as GoToSocialAccount
 import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistration
 import Fediverse.Mastodon.Api as MastodonApi
 import Fediverse.Mastodon.Entities.Account as MastodonAccount
@@ -47,6 +48,7 @@ type MastodonMsg
 type GoToSocialMsg
     = GoToSocialAppCreated String AppDataUUID (GoToSocialApiResult GoToSocialAppRegistration.AppDataFromServer)
     | GoToSocialAccessToken AppDataUUID (GoToSocialApiResult GoToSocialAppRegistration.TokenDataFromServer)
+    | GoToSocialAccount String (GoToSocialApiResult GoToSocialAccount.Account)
 
 
 type PleromaMsg
@@ -79,15 +81,20 @@ backendMsgToFediEntityMsg backendMsg =
                 |> Result.mapError (\_ -> ())
                 |> Result.map (\a -> NodeInfoFetched baseUrl a)
 
-        GoToSocialMsg (GoToSocialAppCreated server uuid result) ->
-            result
-                |> Result.mapError (\_ -> ())
-                |> Result.map (\a -> AppDataReceived uuid <| GoToSocialAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
-
         GoToSocialMsg (GoToSocialAccessToken uuid result) ->
             result
                 |> Result.mapError (\_ -> ())
                 |> Result.map (\a -> TokenDataReceived uuid <| MastodonAppRegistration.toTokenData a.decoded)
+
+        GoToSocialMsg (GoToSocialAccount uuid result) ->
+            result
+                |> Result.mapError (\_ -> ())
+                |> Result.map (\a -> AccountReceived uuid <| GoToSocialAccount.toAccount a.decoded)
+
+        GoToSocialMsg (GoToSocialAppCreated server uuid result) ->
+            result
+                |> Result.mapError (\_ -> ())
+                |> Result.map (\a -> AppDataReceived uuid <| GoToSocialAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
 
         MastodonMsg (MastodonAccessToken uuid result) ->
             result
