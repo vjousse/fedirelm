@@ -19,6 +19,7 @@
             "elm-community/list-extra": "8.7.0",
             "lukewestby/elm-http-builder": "8.0.0",
             "orus-io/elm-spa": "3.0.1",
+            "rtfeldman/elm-iso8601-date-strings": "1.1.4",
             "the-sett/json-optional": "1.0.0"
         },
         "indirect": {
@@ -28,6 +29,7 @@
             "danfishgold/base64-bytes": "1.1.0",
             "elm/bytes": "1.0.8",
             "elm/file": "1.0.5",
+            "elm/parser": "1.1.0",
             "elm/virtual-dom": "1.0.2",
             "rtfeldman/elm-hex": "1.0.0"
         }
