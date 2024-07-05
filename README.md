@@ -1,27 +1,27 @@
 # Fedirelm: a multi backend Fediverse client (Mastodon, Pleroma, GoToSocial,…)
 
-> **Warning**
->
+> [!WARNING]
+> Critical content demanding immediate user attention due to potential risks.
 > This is still a Work In Progress
 
-## Why?
+## ❔ Why?
 
 I love the diversity of the Fediverse, I hate having to use multiple clients to be able to connect to my servers.
 
 The main goal of this code is to provide a client and a library that can connect to multiple Fediverse backends while providing an unified UX to do so.
 
-## How?
+## 🔨 How?
 
 The code is splitted in two parts:
 
 - `Fediverse` is the library abstracting the connection to the backends
 - `Fedirelm` is the web client using the `Fediverse` library to provide an usable UI
 
-## Inspiration
+## 💯 Inspiration
 
 I'm reading [megalodon-rs](https://github.com/h3poteto/megalodon-rs) source code a lot to check how they are doing the backend abstraction.
 
-## FAQ
+## 📚 FAQ
 
 ### Can I use it?
 
@@ -49,7 +49,8 @@ Who knows? The goal of the library is to abstract the backends, so any new backe
 
 It's part of the plan, at some point using [Tauri](https://tauri.app/) as I did for [Pomodorolm](https://github.com/vjousse/pomodorolm).
 
-## License
+## 🆓 License
 
-[AGPL-3.0-or-later](https://www.gnu.org/licenses/agpl-3.0.html
+[AGPL-3.0-or-later](https://www.gnu.org/licenses/agpl-3.0.html)
+
 ![AGDL v3 logo](agplv3.png)
