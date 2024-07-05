@@ -14,10 +14,14 @@ import Fediverse.Pleroma.Entities.AppRegistration as PleromaAppRegistration
 import Http
 
 
+type alias AppDataUUID =
+    String
+
+
 type Msg
-    = AppDataReceived String AppData
+    = AppDataReceived AppDataUUID AppData
     | AccountReceived String Account
-    | TokenDataReceived String TokenData
+    | TokenDataReceived AppDataUUID TokenData
     | LinksDetected String Links
     | NodeInfoFetched String NodeInfo
 
@@ -35,19 +39,19 @@ type alias PleromaApiResult a =
 
 
 type MastodonMsg
-    = MastodonAppCreated String String (MastodonApiResult MastodonAppRegistration.AppDataFromServer)
-    | MastodonAccessToken String (MastodonApiResult MastodonAppRegistration.TokenDataFromServer)
+    = MastodonAppCreated String AppDataUUID (MastodonApiResult MastodonAppRegistration.AppDataFromServer)
+    | MastodonAccessToken AppDataUUID (MastodonApiResult MastodonAppRegistration.TokenDataFromServer)
     | MastodonAccount String (MastodonApiResult MastodonAccount.Account)
 
 
 type GoToSocialMsg
-    = GoToSocialAppCreated String String (GoToSocialApiResult GoToSocialAppRegistration.AppDataFromServer)
-    | GoToSocialAccessToken String (GoToSocialApiResult GoToSocialAppRegistration.TokenDataFromServer)
+    = GoToSocialAppCreated String AppDataUUID (GoToSocialApiResult GoToSocialAppRegistration.AppDataFromServer)
+    | GoToSocialAccessToken AppDataUUID (GoToSocialApiResult GoToSocialAppRegistration.TokenDataFromServer)
 
 
 type PleromaMsg
-    = PleromaAppCreated String String (PleromaApiResult PleromaAppRegistration.AppDataFromServer)
-    | PleromaAccessToken String (PleromaApiResult PleromaAppRegistration.TokenDataFromServer)
+    = PleromaAppCreated String AppDataUUID (PleromaApiResult PleromaAppRegistration.AppDataFromServer)
+    | PleromaAccessToken AppDataUUID (PleromaApiResult PleromaAppRegistration.TokenDataFromServer)
 
 
 type GeneralMsg

@@ -11,6 +11,7 @@ import Fediverse.Msg exposing (BackendMsg(..), GeneralMsg(..), GoToSocialMsg(..)
 import Fediverse.OAuth exposing (AppData, appDataEncoder)
 import Json.Encode as Encode
 import Ports
+import UUID
 
 
 saveSessions : FediSessions -> Cmd Fedirelm.Msg.Msg
@@ -69,12 +70,25 @@ update backendMsg shared =
                         ]
                     )
 
-                AccountReceived uuid account ->
+                AccountReceived sessionUuid account ->
                     let
-                        _ =
-                            Debug.log "Account" account
+                        -- Update the session with the new account
+                        newSessions =
+                            shared.sessions
+                                -- If we have the session locally
+                                |> Fedirelm.Session.findSessionById sessionUuid
+                                -- We update the shared.sessions with it
+                                |> Maybe.map
+                                    (\session ->
+                                        shared.sessions
+                                            |> Fedirelm.Session.updateSession { session | account = Just account }
+                                            |> Maybe.withDefault shared.sessions
+                                    )
+                                -- Otherwise we do Nothing
+                                -- @FIXME: throw an error if we don't find the session locally because we should…
+                                |> Maybe.withDefault shared.sessions
                     in
-                    ( shared, Cmd.none )
+                    ( { shared | sessions = newSessions }, Cmd.none )
 
                 LinksDetected baseUrl links ->
                     let
@@ -101,14 +115,27 @@ update backendMsg shared =
 
                 TokenDataReceived uuid tokenData ->
                     case appDataStorageByUuid uuid shared.appDataStorages of
+                        -- We got a Token and we have a corresponding appData (same uuid) locally
                         Just { appData } ->
                             let
+                                -- Generate new UUID for the session
+                                ( sessionUuid, seeds ) =
+                                    UUID.step shared.seeds |> Tuple.mapFirst UUID.toString
+
+                                -- Create a session for this token and set it as the current session
                                 session =
-                                    { account = Nothing, backend = appData.backend, token = tokenData, baseUrl = appData.baseUrl }
+                                    { account = Nothing
+                                    , backend = appData.backend
+                                    , baseUrl = appData.baseUrl
+                                    , id = sessionUuid
+                                    , token = tokenData
+                                    }
 
                                 sessions =
-                                    Fedirelm.Session.setCurrentSession shared.sessions session
+                                    shared.sessions
+                                        |> Fedirelm.Session.setCurrentSession session
 
+                                -- We can now remove the appData from the local cache, we don't need it anymore
                                 newAppDataStorages =
                                     shared.appDataStorages
                                         |> Maybe.map
@@ -117,14 +144,23 @@ update backendMsg shared =
                                                     |> List.filter (\a -> a.uuid /= uuid)
                                             )
                             in
-                            ( { shared | sessions = sessions, appDataStorages = newAppDataStorages }
+                            ( { shared
+                                | sessions = sessions
+                                , appDataStorages = newAppDataStorages
+                                , seeds = seeds
+                              }
                             , Cmd.batch
-                                [ Ports.deleteAppData uuid
+                                [ -- Delete the appData from localStorage
+                                  Ports.deleteAppData uuid
+
+                                -- Update the sessions with the new one
                                 , saveSessions sessions
+
+                                -- Use the new created token to get the corresponding account
                                 , MastodonApi.getAccount
                                     appData.baseUrl
                                     tokenData.accessToken
-                                    (Fedirelm.Msg.FediMsg << MastodonMsg << MastodonAccount uuid)
+                                    (Fedirelm.Msg.FediMsg << MastodonMsg << MastodonAccount sessionUuid)
                                 ]
                             )
 

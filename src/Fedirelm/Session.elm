@@ -9,10 +9,15 @@ import Json.Encode as Encode
 import List.Extra
 
 
+type alias SessionId =
+    String
+
+
 type alias FediSession =
     { account : Maybe Account
     , backend : Backend
     , baseUrl : String
+    , id : SessionId
     , token : TokenData
     }
 
@@ -29,6 +34,7 @@ sessionEncoder s =
         [ ( "account", s.account |> Maybe.map accountEncoder |> Maybe.withDefault Encode.null )
         , ( "backend", backendEncoder s.backend )
         , ( "baseUrl", Encode.string s.baseUrl )
+        , ( "id", Encode.string s.id )
         , ( "token", tokenDataEncoder s.token )
         ]
 
@@ -47,6 +53,7 @@ sessionDecoder =
         |> Pipe.required "account" (Decode.nullable accountDecoder)
         |> Pipe.required "backend" backendDecoder
         |> Pipe.required "baseUrl" Decode.string
+        |> Pipe.required "id" Decode.string
         |> Pipe.required "token" tokenDataDecoder
 
 
@@ -57,8 +64,58 @@ sessionsDecoder =
         |> Pipe.required "otherSessions" (Decode.list sessionDecoder)
 
 
-setCurrentSession : FediSessions -> FediSession -> FediSessions
-setCurrentSession sessions currentSession =
+sessionsToList : FediSessions -> List FediSession
+sessionsToList sessions =
+    sessions.otherSessions ++ (sessions.currentSession |> Maybe.map List.singleton |> Maybe.withDefault [])
+
+
+findSessionById : String -> FediSessions -> Maybe FediSession
+findSessionById id sessions =
+    sessions
+        |> sessionsToList
+        |> List.Extra.find (\s -> s.id == id)
+
+
+updateSession : FediSession -> FediSessions -> Maybe FediSessions
+updateSession updatedSession sessions =
+    case ( sessions.currentSession, sessions.otherSessions ) of
+        ( Nothing, otherSessions ) ->
+            let
+                sessionInOtherSessions =
+                    otherSessions |> List.Extra.find (\s -> s.id == updatedSession.id)
+            in
+            sessionInOtherSessions
+                |> Maybe.map
+                    (\_ ->
+                        { currentSession = Nothing
+                        , otherSessions =
+                            otherSessions
+                                |> List.map
+                                    (\s ->
+                                        if s.id == updatedSession.id then
+                                            { account = s.account
+                                            , backend = s.backend
+                                            , baseUrl = s.baseUrl
+                                            , id = s.id
+                                            , token = s.token
+                                            }
+
+                                        else
+                                            s
+                                    )
+                        }
+                    )
+
+        ( Just currentSession, _ ) ->
+            if currentSession.id == updatedSession.id then
+                Just { sessions | currentSession = Just updatedSession }
+
+            else
+                Nothing
+
+
+setCurrentSession : FediSession -> FediSessions -> FediSessions
+setCurrentSession currentSession sessions =
     let
         previousCurrentSession =
             sessions.currentSession
