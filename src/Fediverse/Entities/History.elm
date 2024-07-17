@@ -1,4 +1,4 @@
-module Fediverse.Mastodon.Entities.History exposing (..)
+module Fediverse.Entities.History exposing (..)
 
 import Fediverse.Decoder exposing (stringToIntDecoder)
 import Json.Decode as Decode

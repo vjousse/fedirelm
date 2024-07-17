@@ -14,10 +14,6 @@ import Json.Decode.Pipeline as Pipe
 import Time exposing (Posix)
 
 
-type MovedAccount
-    = MovedAccount Account
-
-
 type RebloggedStatus
     = RebloggedStatus Status
 

@@ -1,4 +1,4 @@
-module Fediverse.Mastodon.Entities.Attachment exposing (..)
+module Fediverse.Entities.Attachment exposing (..)
 
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipe
@@ -13,7 +13,7 @@ type alias Attachment =
     , remoteUrl : Maybe String
     , textUrl : Maybe String
     , type_ : AttachmentType
-    , url : Maybe String
+    , url : String
     }
 
 
@@ -28,7 +28,7 @@ attachmentDecoder =
         |> Pipe.optional "remote_url" (Decode.nullable Decode.string) Nothing
         |> Pipe.optional "text_url" (Decode.nullable Decode.string) Nothing
         |> Pipe.required "type" attachmentTypeDecoder
-        |> Pipe.optional "url" (Decode.nullable Decode.string) Nothing
+        |> Pipe.required "url" Decode.string
 
 
 type alias AttachmentMeta =
