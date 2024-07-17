@@ -3,6 +3,7 @@ module Fediverse.Mastodon.Api exposing (..)
 import Fediverse.Default exposing (noRedirect)
 import Fediverse.Mastodon.Entities.Account exposing (Account, accountDecoder)
 import Fediverse.Mastodon.Entities.AppRegistration exposing (AppDataFromServer, TokenDataFromServer, appDataFromServerDecoder, appRegistrationDataEncoder, tokenDataFromServerDecoder)
+import Fediverse.Mastodon.Entities.Status exposing (Status, statusDecoder)
 import Fediverse.OAuth exposing (AppData)
 import Http
 import HttpBuilder
@@ -88,6 +89,14 @@ verifiyCredentials : String -> String -> (Result Error (Response Account) -> msg
 verifiyCredentials baseUrl token toMsg =
     HttpBuilder.get (baseUrl ++ "/api/v1/accounts/verify_credentials")
         |> withBodyDecoder toMsg accountDecoder
+        |> HttpBuilder.withHeader "Authorization" ("Bearer " ++ token)
+        |> HttpBuilder.request
+
+
+getPublicTimeline : String -> String -> (Result Error (Response Status) -> msg) -> Cmd msg
+getPublicTimeline baseUrl token toMsg =
+    HttpBuilder.get (baseUrl ++ "/api/v1/timelines/public")
+        |> withBodyDecoder toMsg statusDecoder
         |> HttpBuilder.withHeader "Authorization" ("Bearer " ++ token)
         |> HttpBuilder.request
 
