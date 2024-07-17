@@ -17,6 +17,11 @@ The code is splitted in two parts:
 - `Fediverse` is the library abstracting the connection to the backends
 - `Fedirelm` is the web client using the `Fediverse` library to provide an usable UI
 
+You can install and run the project using npm :
+
+    npm install
+    npm run dev
+
 ## 💯 Inspiration
 
 I'm reading [megalodon-rs](https://github.com/h3poteto/megalodon-rs) source code a lot to check how they are doing the backend abstraction.
@@ -25,7 +30,7 @@ I'm reading [megalodon-rs](https://github.com/h3poteto/megalodon-rs) source code
 
 ### Can I use it?
 
-No really for now. You can contribute by mapping some backends if you want to, but it's not usable in production for now.
+No, not really for now. You can contribute by mapping some backends if you want to, but it's not usable in production for now.
 
 ### What are the supported backend?
 
