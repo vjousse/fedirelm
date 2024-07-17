@@ -107,7 +107,7 @@ update backendMsg shared =
                         |> Maybe.withDefault Cmd.none
                     )
 
-                NodeInfoFetched baseUrl nodeInfo ->
+                NodeInfoFetched _ nodeInfo ->
                     let
                         _ =
                             Debug.log "nodeInfoFetched" nodeInfo
