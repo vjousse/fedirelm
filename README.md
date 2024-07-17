@@ -1,7 +1,6 @@
 # Fedirelm: a multi backend Fediverse client (Mastodon, Pleroma, GoToSocial,…)
 
 > [!WARNING]
-> Critical content demanding immediate user attention due to potential risks.
 > This is still a Work In Progress
 
 ## ❔ Why?
