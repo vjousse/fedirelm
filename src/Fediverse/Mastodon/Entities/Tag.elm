@@ -17,6 +17,6 @@ tagDecoder : Decode.Decoder Tag
 tagDecoder =
     Decode.succeed Tag
         |> Pipe.optional "following" (Decode.nullable Decode.bool) Nothing
-        |> Pipe.required "history" (Decode.list historyDecoder)
+        |> Pipe.optional "history" (Decode.list historyDecoder) []
         |> Pipe.required "name" Decode.string
         |> Pipe.required "url" Decode.string
