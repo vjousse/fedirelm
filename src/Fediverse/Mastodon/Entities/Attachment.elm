@@ -1,5 +1,6 @@
 module Fediverse.Mastodon.Entities.Attachment exposing (..)
 
+import Fediverse.Entities.Attachment as FediverseAttachment exposing (AttachmentType(..))
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipe
 
@@ -137,3 +138,69 @@ attachmentTypeDecoder =
                     _ ->
                         Decode.fail "Invalid AttachementType value"
             )
+
+
+toAttachmentType : AttachmentType -> FediverseAttachment.AttachmentType
+toAttachmentType self =
+    case self of
+        Audio ->
+            FediverseAttachment.Audio
+
+        Gifv ->
+            FediverseAttachment.Gifv
+
+        Image ->
+            FediverseAttachment.Image
+
+        Unknown ->
+            FediverseAttachment.Unknown
+
+        Video ->
+            FediverseAttachment.Video
+
+
+toMetaSub : MetaSub -> FediverseAttachment.MetaSub
+toMetaSub self =
+    { -- For Image, Gifv, Video
+      aspect = self.aspect
+    , bitrate = self.bitrate
+    , -- For Audio, Gifv, Video
+      duration = self.duration
+    , -- For Gifv, Video
+      frameRate = self.frameRate
+    , height = self.height
+    , size = self.size
+    , width = self.width
+    }
+
+
+toAttachmentMeta : AttachmentMeta -> FediverseAttachment.AttachmentMeta
+toAttachmentMeta self =
+    { aspect = self.aspect
+    , audioBitrate = self.audioBitrate
+    , audioChannel = self.audioChannel
+    , audioEncode = self.audioEncode
+    , duration = self.duration
+    , focus = self.focus
+    , fps = self.fps
+    , height = self.height
+    , length = self.length
+    , original = self.original |> Maybe.map toMetaSub
+    , size = self.size
+    , small = self.small |> Maybe.map toMetaSub
+    , width = self.width
+    }
+
+
+toAttachment : Attachment -> FediverseAttachment.Attachment
+toAttachment self =
+    { blurhash = self.blurhash
+    , description = self.description
+    , id = self.id
+    , meta = self.meta |> Maybe.map toAttachmentMeta
+    , previewUrl = self.previewUrl
+    , remoteUrl = self.remoteUrl
+    , textUrl = self.textUrl
+    , type_ = toAttachmentType self.type_
+    , url = self.url |> Maybe.withDefault ""
+    }

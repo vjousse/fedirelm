@@ -1,9 +1,10 @@
 module Fediverse.Mastodon.Entities.Status exposing (..)
 
-import Fediverse.Mastodon.Entities.Account exposing (Account, accountDecoder)
+import Fediverse.Entities.Status as FediverseStatus
+import Fediverse.Mastodon.Entities.Account exposing (Account, accountDecoder, toAccount)
 import Fediverse.Mastodon.Entities.Application exposing (Application, applicationDecoder)
-import Fediverse.Mastodon.Entities.Attachment exposing (Attachment, attachmentDecoder)
-import Fediverse.Mastodon.Entities.Card exposing (Card, cardDecoder)
+import Fediverse.Mastodon.Entities.Attachment exposing (Attachment, attachmentDecoder, toAttachment)
+import Fediverse.Mastodon.Entities.Card exposing (Card, cardDecoder, toCard)
 import Fediverse.Mastodon.Entities.Emoji exposing (Emoji, emojiDecoder)
 import Fediverse.Mastodon.Entities.Mention exposing (Mention, mentionDecoder)
 import Fediverse.Mastodon.Entities.Poll exposing (Poll, pollDecoder)
@@ -119,3 +120,68 @@ statusVisibilityDecoder =
                     _ ->
                         Decode.fail "Invalid StatusVisibility value"
             )
+
+
+toStatusVisibility : StatusVisibility -> FediverseStatus.StatusVisibility
+toStatusVisibility self =
+    case self of
+        Direct ->
+            FediverseStatus.Direct
+
+        Private ->
+            FediverseStatus.Private
+
+        Public ->
+            FediverseStatus.Public
+
+        Unlisted ->
+            FediverseStatus.Unlisted
+
+
+toStatus : Status -> FediverseStatus.Status
+toStatus self =
+    let
+        ( reblogStatus, quoted ) =
+            case ( self.reblog, self.quote ) of
+                ( Just (RebloggedStatus status), _ ) ->
+                    ( Just (FediverseStatus.RebloggedStatus (status |> toStatus)), False )
+
+                ( _, Just (QuotedStatus status) ) ->
+                    ( Just (FediverseStatus.RebloggedStatus (status |> toStatus)), True )
+
+                ( _, _ ) ->
+                    ( Nothing, False )
+    in
+    { account = toAccount self.account
+    , application = self.application
+    , bookmarked = self.bookmarked
+    , card = self.card |> Maybe.map toCard
+    , content = self.content
+    , createdAt = self.createdAt
+    , editedAt = self.editedAt
+    , emojiReactions = Nothing
+    , emojis = self.emojis
+    , favourited = self.favourited
+    , favouritesCount = self.favouritesCount
+    , id = self.id
+    , inReplyToAccountId = self.inReplyToAccountId
+    , inReplyToId = self.inReplyToId
+    , language = self.language
+    , mediaAttachments = self.mediaAttachments |> List.map toAttachment
+    , mentions = self.mentions
+    , muted = self.muted
+    , pinned = self.pinned
+    , plainContent = Nothing
+    , poll = self.poll
+    , quote = quoted
+    , reblog = reblogStatus
+    , reblogged = self.reblogged
+    , reblogsCount = self.reblogsCount
+    , repliesCount = self.repliesCount
+    , sensitive = self.sensitive
+    , spoilerText = self.spoilerText
+    , tags = self.tags
+    , uri = self.uri
+    , url = self.url
+    , visibility = toStatusVisibility self.visibility
+    }

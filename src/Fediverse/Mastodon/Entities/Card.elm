@@ -1,5 +1,6 @@
 module Fediverse.Mastodon.Entities.Card exposing (..)
 
+import Fediverse.Entities.Card as FediverseCard exposing (CardType(..))
 import Json.Decode as Decode
 import Json.Decode.Pipeline as Pipe
 
@@ -69,3 +70,38 @@ cardTypeDecoder =
                     _ ->
                         Decode.fail "Invalid CardType value"
             )
+
+
+toCardType : CardType -> FediverseCard.CardType
+toCardType self =
+    case self of
+        Link ->
+            FediverseCard.Link
+
+        Photo ->
+            FediverseCard.Photo
+
+        Rich ->
+            FediverseCard.Rich
+
+        Video ->
+            FediverseCard.Video
+
+
+toCard : Card -> FediverseCard.Card
+toCard self =
+    { authorName = Just self.authorName
+    , authorUrl = Just self.authorUrl
+    , blurhash = self.blurhash
+    , description = self.description
+    , embedUrl = Just self.embedUrl
+    , height = Just self.height
+    , html = Just self.html
+    , image = self.image
+    , providerName = self.providerName
+    , providerUrl = self.providerUrl
+    , title = self.title
+    , type_ = toCardType self.type_
+    , url = self.url
+    , width = Just self.width
+    }
