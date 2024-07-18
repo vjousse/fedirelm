@@ -3,12 +3,14 @@ module Fediverse.Msg exposing (..)
 import Fediverse.Default
 import Fediverse.Detector exposing (Links, NodeInfo)
 import Fediverse.Entities.Account exposing (Account)
+import Fediverse.Entities.Status exposing (Status)
 import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.GoToSocial.Entities.Account as GoToSocialAccount
 import Fediverse.GoToSocial.Entities.AppRegistration as GoToSocialAppRegistration
 import Fediverse.Mastodon.Api as MastodonApi
 import Fediverse.Mastodon.Entities.Account as MastodonAccount
 import Fediverse.Mastodon.Entities.AppRegistration as MastodonAppRegistration
+import Fediverse.Mastodon.Entities.Status as MastodonStatus
 import Fediverse.OAuth exposing (AppData, TokenData)
 import Fediverse.Pleroma.Api as PleromaApi
 import Fediverse.Pleroma.Entities.Account as PleromaAccount
@@ -20,12 +22,17 @@ type alias AppDataUUID =
     String
 
 
+type Timeline
+    = Public
+
+
 type Msg
     = AppDataReceived AppDataUUID AppData
     | AccountReceived String Account
-    | TokenDataReceived AppDataUUID TokenData
     | LinksDetected String Links
     | NodeInfoFetched String NodeInfo
+    | TimelineReceived Timeline String (List Status)
+    | TokenDataReceived AppDataUUID TokenData
 
 
 type alias MastodonApiResult a =
@@ -41,9 +48,10 @@ type alias PleromaApiResult a =
 
 
 type MastodonMsg
-    = MastodonAppCreated String AppDataUUID (MastodonApiResult MastodonAppRegistration.AppDataFromServer)
-    | MastodonAccessToken AppDataUUID (MastodonApiResult MastodonAppRegistration.TokenDataFromServer)
+    = MastodonAccessToken AppDataUUID (MastodonApiResult MastodonAppRegistration.TokenDataFromServer)
     | MastodonAccount String (MastodonApiResult MastodonAccount.Account)
+    | MastodonAppCreated String AppDataUUID (MastodonApiResult MastodonAppRegistration.AppDataFromServer)
+    | MastodonTimeline Timeline String (MastodonApiResult (List MastodonStatus.Status))
 
 
 type GoToSocialMsg
@@ -112,6 +120,11 @@ backendMsgToFediEntityMsg backendMsg =
             result
                 |> Result.mapError (\_ -> ())
                 |> Result.map (\a -> AppDataReceived uuid <| MastodonAppRegistration.toAppData a.decoded server Fediverse.Default.defaultScopes)
+
+        MastodonMsg (MastodonTimeline timeline uuid result) ->
+            result
+                |> Result.mapError (\_ -> ())
+                |> Result.map (\a -> TimelineReceived timeline uuid <| (a.decoded |> List.map MastodonStatus.toStatus))
 
         PleromaMsg (PleromaAccessToken uuid result) ->
             result

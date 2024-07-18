@@ -80,14 +80,30 @@ init flagsJson key =
     in
     case flagsResult of
         Ok flags ->
+            let
+                sessions =
+                    flags.sessions
+                        |> Maybe.withDefault { currentSession = Nothing, otherSessions = [] }
+
+                commands =
+                    case sessions.currentSession of
+                        Just s ->
+                            MastodonApi.getPublicTimeline
+                                s.baseUrl
+                                s.token.accessToken
+                                (Fedirelm.Msg.FediMsg << MastodonMsg << MastodonTimeline Fediverse.Msg.Public s.id)
+
+                        Nothing ->
+                            Cmd.none
+            in
             ( { appDataStorages = flags.appDataStorages
               , identity = Nothing
               , key = key
               , location = Url.Builder.crossOrigin flags.location [ Maybe.withDefault "" flags.prefix ] []
               , seeds = flags.seeds
-              , sessions = Maybe.withDefault { currentSession = Nothing, otherSessions = [] } flags.sessions
+              , sessions = sessions
               }
-            , Cmd.none
+            , commands
             )
 
         --@TODO: properly manage the flag decoding error

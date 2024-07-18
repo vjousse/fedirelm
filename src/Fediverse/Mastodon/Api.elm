@@ -93,10 +93,10 @@ verifiyCredentials baseUrl token toMsg =
         |> HttpBuilder.request
 
 
-getPublicTimeline : String -> String -> (Result Error (Response Status) -> msg) -> Cmd msg
+getPublicTimeline : String -> String -> (Result Error (Response (List Status)) -> msg) -> Cmd msg
 getPublicTimeline baseUrl token toMsg =
     HttpBuilder.get (baseUrl ++ "/api/v1/timelines/public")
-        |> withBodyDecoder toMsg statusDecoder
+        |> withBodyDecoder toMsg (Decode.list statusDecoder)
         |> HttpBuilder.withHeader "Authorization" ("Bearer " ++ token)
         |> HttpBuilder.request
 

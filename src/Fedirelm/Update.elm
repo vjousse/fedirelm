@@ -9,7 +9,7 @@ import Fediverse.Detector exposing (findLink, getNodeInfo)
 import Fediverse.Entities.Backend exposing (Backend(..))
 import Fediverse.GoToSocial.Api as GoToSocialApi
 import Fediverse.Mastodon.Api as MastodonApi
-import Fediverse.Msg exposing (BackendMsg(..), GeneralMsg(..), GoToSocialMsg(..), MastodonMsg(..), Msg(..), PleromaMsg(..), backendMsgToFediEntityMsg)
+import Fediverse.Msg exposing (BackendMsg(..), GeneralMsg(..), GoToSocialMsg(..), MastodonMsg(..), Msg(..), PleromaMsg(..), Timeline(..), backendMsgToFediEntityMsg)
 import Fediverse.OAuth exposing (AppData, appDataEncoder)
 import Fediverse.Pleroma.Api as PleromaApi
 import Json.Encode as Encode
@@ -42,12 +42,12 @@ saveAppData uuid appData =
 update : BackendMsg -> SharedModel -> ( SharedModel, Cmd Fedirelm.Msg.Msg )
 update backendMsg shared =
     let
-        fediMsg =
+        fediMsgResult =
             Debug.log "fediMsg" (backendMsgToFediEntityMsg backendMsg)
     in
-    case fediMsg of
-        Ok m ->
-            case m of
+    case fediMsgResult of
+        Ok fediMsg ->
+            case fediMsg of
                 AppDataReceived uuid appData ->
                     let
                         appDataStorage =
@@ -75,11 +75,14 @@ update backendMsg shared =
 
                 AccountReceived sessionUuid account ->
                     let
-                        -- Update the session with the new account
-                        newSessions =
+                        existingSession =
                             shared.sessions
                                 -- If we have the session locally
                                 |> Fedirelm.Session.findSessionById sessionUuid
+
+                        -- Update the session with the new account
+                        newSessions =
+                            existingSession
                                 -- We update the shared.sessions with it
                                 |> Maybe.map
                                     (\session ->
@@ -91,7 +94,20 @@ update backendMsg shared =
                                 -- @FIXME: throw an error if we don't find the session locally because we should…
                                 |> Maybe.withDefault shared.sessions
                     in
-                    ( { shared | sessions = newSessions }, saveSessions newSessions )
+                    ( { shared | sessions = newSessions }
+                    , Cmd.batch
+                        [ saveSessions newSessions
+                        , case existingSession of
+                            Just s ->
+                                MastodonApi.getPublicTimeline
+                                    s.baseUrl
+                                    s.token.accessToken
+                                    (Fedirelm.Msg.FediMsg << MastodonMsg << MastodonTimeline Fediverse.Msg.Public sessionUuid)
+
+                            Nothing ->
+                                Cmd.none
+                        ]
+                    )
 
                 LinksDetected baseUrl links ->
                     let
@@ -174,6 +190,19 @@ update backendMsg shared =
 
                         _ ->
                             ( shared, Cmd.none )
+
+                TimelineReceived timeline sessionUuid statuses ->
+                    let
+                        _ =
+                            Debug.log "Timeline" timeline
+
+                        _ =
+                            Debug.log "sessionUuid" sessionUuid
+
+                        _ =
+                            Debug.log "statuses" statuses
+                    in
+                    ( shared, Cmd.none )
 
         _ ->
             ( shared, Cmd.none )
